@@ -1,0 +1,226 @@
+:root {
+  --paper: #f5f7f4;
+  --sheet: #ffffff;
+  --ink: #1c2b26;
+  --muted: #66766f;
+  --rule: #dde4df;
+  --green: #1f6b4f;
+  --green-deep: #154d39;
+  --mint: #e4f1e9;
+  --expense: #b4442c;
+  --income: #1f6b4f;
+  --lend: #a7700b;
+  --focus: #2f8f6a;
+  --font: "Onest", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 16px/1.5 var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* ---------- Шапка ---------- */
+
+.top { background: var(--green); color: #fff; }
+.top-inner {
+  max-width: 1180px; margin: 0 auto; padding: 14px 24px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.brand { font-weight: 700; font-size: 19px; letter-spacing: -0.01em; }
+.month { display: flex; align-items: center; gap: 4px; }
+.month-label { min-width: 150px; text-align: center; font-weight: 600; font-size: 17px; }
+.month-arrow {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, .35); background: transparent; color: #fff;
+  font-size: 20px; line-height: 1; cursor: pointer;
+}
+.month-arrow:hover { background: rgba(255, 255, 255, .12); }
+.month-arrow:focus-visible { outline-color: #fff; }
+
+/* ---------- Аккаунт ---------- */
+
+.account { display: flex; align-items: center; gap: 12px; font-size: 14px; }
+.user-email { opacity: .85; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.logout {
+  background: none; border: 1px solid rgba(255, 255, 255, .35); color: #fff;
+  border-radius: 8px; padding: 5px 12px; cursor: pointer;
+}
+.logout:hover { background: rgba(255, 255, 255, .12); }
+.logout:focus-visible { outline-color: #fff; }
+
+.auth { min-height: calc(100vh - 64px); display: grid; place-items: center; padding: 32px 16px; }
+.auth-card {
+  width: 100%; max-width: 380px; background: var(--sheet);
+  border: 1px solid var(--rule); border-radius: 16px; padding: 28px;
+}
+.auth-card h1 { margin: 0 0 6px; font-size: 26px; letter-spacing: -0.02em; }
+.auth-lead { margin: 0 0 20px; color: var(--muted); font-size: 15px; }
+.auth-card label { display: block; font-size: 14px; font-weight: 500; margin: 12px 0 6px; }
+.auth-card input { width: 100%; }
+.auth-hint { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+.auth-error { min-height: 1.3em; margin: 12px 0 4px; color: var(--expense); font-size: 14px; }
+.btn.wide { width: 100%; padding: 11px; }
+.auth-switch { margin: 16px 0 0; text-align: center; color: var(--muted); font-size: 14px; }
+.link-btn { background: none; border: 0; padding: 0; color: var(--green); font-weight: 500; cursor: pointer; text-decoration: underline; }
+
+.ai-note { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+
+main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 64px; display: grid; gap: 28px; }
+
+/* ---------- Итоги ---------- */
+
+.summary {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap;
+  padding-bottom: 20px; border-bottom: 1px solid var(--rule);
+}
+.balance-label { display: block; color: var(--muted); font-size: 15px; }
+.balance-value {
+  display: block; font-size: clamp(40px, 6vw, 60px); font-weight: 700; line-height: 1.05;
+  letter-spacing: -0.03em; font-variant-numeric: tabular-nums;
+}
+.balance-value.negative { color: var(--expense); }
+.totals { display: flex; gap: 36px; margin: 0; }
+.totals dt { color: var(--muted); font-size: 14px; }
+.totals dd { margin: 0; font-size: 21px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.income { color: var(--income); }
+.expense { color: var(--expense); }
+.lend { color: var(--lend); }
+
+/* ---------- Ввод ---------- */
+
+.entry {
+  background: var(--sheet); border: 1px solid var(--rule); border-radius: 14px; padding: 20px;
+}
+.entry-label { display: block; font-weight: 600; font-size: 17px; margin-bottom: 10px; }
+textarea, input, select {
+  border: 1px solid var(--rule); border-radius: 8px; padding: 9px 12px; background: #fff;
+}
+textarea { width: 100%; resize: vertical; min-height: 64px; }
+textarea:focus, input:focus, select:focus { border-color: var(--focus); outline: none; box-shadow: 0 0 0 3px var(--mint); }
+
+.entry-actions { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.entry-actions.end { justify-content: flex-end; }
+#parse { margin-left: auto; }
+
+.btn { border-radius: 8px; padding: 9px 18px; cursor: pointer; border: 1px solid transparent; font-weight: 500; }
+.btn:disabled { opacity: .6; cursor: progress; }
+.btn.primary { background: var(--green); color: #fff; }
+.btn.primary:hover { background: var(--green-deep); }
+.btn.ghost { background: #fff; border-color: var(--rule); }
+.btn.ghost:hover { border-color: var(--muted); }
+.btn.ghost.listening { border-color: var(--expense); color: var(--expense); }
+
+.status:empty { display: none; }
+.status { min-height: 1.4em; margin: 8px 0 0; color: var(--muted); font-size: 14px; }
+.status.error { color: var(--expense); }
+
+.preview { margin-top: 8px; padding-top: 12px; border-top: 1px dashed var(--rule); }
+.preview-head { margin: 0 0 6px; font-size: 14px; color: var(--muted); }
+.source { color: var(--green); font-weight: 500; }
+.preview-item {
+  display: grid; grid-template-columns: 150px 190px 120px 1fr 36px; gap: 8px; align-items: center;
+  padding: 6px 0;
+}
+.preview-item input, .preview-item select { width: 100%; min-width: 0; }
+
+.icon-btn {
+  width: 32px; height: 32px; border-radius: 50%; border: 0; background: none;
+  color: var(--muted); font-size: 20px; line-height: 1; cursor: pointer;
+}
+.icon-btn:hover { background: #fbe9e5; color: var(--expense); }
+
+/* ---------- Таблица / список ---------- */
+
+.ledger { background: var(--sheet); border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; }
+.ledger-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 16px; border-bottom: 1px solid var(--rule);
+}
+.tabs { display: inline-flex; background: var(--paper); border-radius: 9px; padding: 3px; }
+.tab {
+  border: 0; background: none; padding: 6px 16px; border-radius: 7px; cursor: pointer;
+  color: var(--muted); font-weight: 500;
+}
+.tab[aria-selected="true"] { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(28, 43, 38, .12); }
+.ledger-actions { display: flex; gap: 16px; align-items: center; }
+.export { color: var(--green); font-size: 15px; font-weight: 500; }
+
+.table-wrap { overflow: auto; max-height: 70vh; }
+.sheet { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+.sheet th, .sheet td { padding: 8px 9px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+.sheet thead th {
+  position: sticky; top: 0; z-index: 2; background: #fff;
+  font-weight: 600; font-size: 13px; color: var(--muted); text-align: right; vertical-align: bottom;
+  border-bottom: 2px solid var(--ink);
+  white-space: normal; min-width: 76px; max-width: 160px; line-height: 1.25;
+}
+.sheet th:first-child, .sheet td:first-child {
+  position: sticky; left: 0; z-index: 1; background: #fff; text-align: left;
+  border-right: 1px solid var(--rule);
+}
+.sheet thead th:first-child { z-index: 3; }
+.sheet td { text-align: right; }
+.sheet td.cell { position: relative; }
+.sheet td.cell[data-heat] { background: rgba(31, 107, 79, var(--heat)); }
+.sheet .day-col { color: var(--ink); font-weight: 500; }
+.sheet .day-col small { color: var(--muted); margin-left: 6px; }
+.sheet .weekend .day-col small { color: var(--expense); }
+.sheet tr.today td:first-child { box-shadow: inset 3px 0 0 var(--green); font-weight: 600; }
+.sheet .col-total { font-weight: 600; }
+.sheet .col-first-cat { border-left: 1px solid var(--rule); }
+.sheet .col-income { color: var(--income); }
+.sheet .col-lend { color: var(--lend); }
+.sheet tbody tr:hover td, .sheet tbody tr:hover th { background-color: var(--mint); }
+.sheet tbody tr:hover td.cell[data-heat] { background: rgba(31, 107, 79, calc(var(--heat) + .08)); }
+.sheet tfoot td {
+  position: sticky; bottom: 0; background: #fff; font-weight: 700;
+  border-top: 2px solid var(--ink); border-bottom: 0;
+}
+.sheet .empty-cell { color: var(--rule); }
+
+.list { padding: 4px 16px 12px; }
+.day { margin-top: 14px; }
+.day-head { display: flex; justify-content: space-between; color: var(--muted); font-size: 13px; padding-bottom: 4px; border-bottom: 1px solid var(--rule); }
+.tx { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--rule); }
+.tx-cat { font-size: 13px; color: var(--muted); }
+.tx-amount { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+.empty { color: var(--muted); padding: 24px 16px; margin: 0; }
+
+/* ---------- Категории ---------- */
+
+.categories h2 { margin: 0 0 14px; font-size: 19px; font-weight: 600; }
+.bars { display: grid; gap: 10px; max-width: 760px; }
+.bar { display: grid; grid-template-columns: 180px 1fr 110px; gap: 12px; align-items: center; font-size: 15px; }
+.bar-track { height: 8px; background: var(--rule); border-radius: 4px; overflow: hidden; }
+.bar-fill { height: 100%; background: var(--green); border-radius: 4px; }
+.bar b { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.bar small { color: var(--muted); font-weight: 400; margin-left: 4px; }
+
+@media (max-width: 720px) {
+  .top-inner, main { padding-left: 16px; padding-right: 16px; }
+  .month-label { min-width: 104px; font-size: 15px; }
+  .top-inner { flex-wrap: wrap; row-gap: 8px; }
+  .user-email { display: none; }
+  .totals { gap: 20px; width: 100%; justify-content: space-between; }
+  .totals dd { font-size: 17px; }
+  .preview-item { grid-template-columns: 1fr 1fr; }
+  .preview-item .desc { grid-column: 1 / 2; }
+  .bar { grid-template-columns: 1fr auto; row-gap: 6px; }
+  .bar-track { grid-column: 1 / -1; grid-row: 2; }
+  .sheet th, .sheet td { padding: 7px 9px; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .bar-fill { transition: width .4s ease-out; }
+}

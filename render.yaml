@@ -1,0 +1,21 @@
+# Настройки для Render (render.com): New → Blueprint → выберите этот репозиторий.
+# База данных — бесплатная PostgreSQL на neon.com, её адрес вставляется в DATABASE_URL.
+services:
+  - type: web
+    name: ai-finance-tracker
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: AI_API_KEY
+        sync: false
+      - key: AI_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: AI_MODEL
+        sync: false
