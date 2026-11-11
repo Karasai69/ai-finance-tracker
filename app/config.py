@@ -18,7 +18,16 @@ def normalize_database_url(url: str) -> str:
 
 class Settings:
     def __init__(self) -> None:
-        self.database_url = normalize_database_url(os.getenv("DATABASE_URL", "sqlite:///./finance.db"))
+        database_url = (os.getenv("DATABASE_URL") or "").strip()
+        if not database_url:
+            # На Render файловая система временная: без внешней базы данные пропадут
+            if os.getenv("RENDER"):
+                raise RuntimeError(
+                    "DATABASE_URL не задан. Добавьте строку подключения к PostgreSQL (Neon) "
+                    "в Render → Environment."
+                )
+            database_url = "sqlite:///./finance.db"
+        self.database_url = normalize_database_url(database_url)
 
         # Любой провайдер с OpenAI-совместимым API (Groq, Google Gemini, OpenAI и др.)
         self.ai_api_key = os.getenv("AI_API_KEY") or None
