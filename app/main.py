@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import func, inspect, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import parser
@@ -14,8 +14,9 @@ from app.auth import get_current_user
 from app.auth import router as auth_router
 from app.categories import CATEGORIES, KINDS, kind_of, normalize_category
 from app.config import settings
-from app.database import Base, engine, get_db
+from app.database import get_db
 from app.importer import parse_csv
+from app.migrate import run_migrations
 from app.models import Transaction, User
 from app.schemas import (
     CategoryTotal,
@@ -34,20 +35,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 MONTH_PATTERN = r"^\d{4}-(0[1-9]|1[0-2])$"
 
 
-def check_old_schema() -> None:
-    """База из версии без аккаунтов не подходит: в ней нет колонки user_id."""
-    tables = inspect(engine)
-    if tables.has_table("transactions"):
-        columns = {col["name"] for col in tables.get_columns("transactions")}
-        if "user_id" not in columns:
-            raise RuntimeError(
-                "База данных создана старой версией приложения (без аккаунтов). "
-                "Удалите файл finance.db и запустите снова."
-            )
-
-
-check_old_schema()
-Base.metadata.create_all(bind=engine)
+run_migrations()
 
 app = FastAPI(title="AI Finance Tracker", version="0.2.0")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

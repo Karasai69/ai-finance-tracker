@@ -214,11 +214,12 @@ function renderTable(rows) {
   const hasLend = rows.some((r) => r.kind === "lend");
 
   // Суммы по дням
-  const cells = new Map(); // "2026-11-04|transport" -> { total, notes[] }
+  const cells = new Map(); // "2026-11-04|transport" -> { total, notes[], rows[] }
   const add = (key, row) => {
-    const cell = cells.get(key) || { total: 0, notes: [] };
+    const cell = cells.get(key) || { total: 0, notes: [], rows: [] };
     cell.total += row.amount;
     cell.notes.push(`${row.description || state.names[row.category]}: ${fmt(row.amount)}`);
+    cell.rows.push(row);
     cells.set(key, cell);
   };
   for (const row of rows) {
@@ -261,13 +262,22 @@ function renderTable(rows) {
     const date = new Date(y, m - 1, d);
     const weekday = date.toLocaleDateString("ru-RU", { weekday: "short" });
     const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+    const dayRows = rows.filter((r) => r.date === iso);
+    const dayLabel = date.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" });
     const tr = el("tr", { class: [isWeekend && "weekend", iso === today && "today"].filter(Boolean).join(" ") || null },
-      el("th", { scope: "row", class: "day-col" }, `${d}`, el("small", {}, weekday)),
+      el("th", { scope: "row", class: dayRows.length ? "day-col clickable" : "day-col",
+        onclick: dayRows.length ? () => openEditor(dayLabel, dayRows) : null },
+        `${d}`, el("small", {}, weekday)),
     );
     for (const col of columns) {
       const cell = cells.get(`${iso}|${col.key}`);
-      const td = el("td", { class: ["cell", col.cls].filter(Boolean).join(" "), title: cell ? cell.notes.join("\n") : null },
-        cell ? fmt(cell.total) : el("span", { class: "empty-cell" }, "·"));
+      const td = el("td", {
+        class: ["cell", col.cls, cell && "clickable"].filter(Boolean).join(" "),
+        title: cell ? cell.notes.join("\n") : null,
+        tabindex: cell ? "0" : null,
+        onclick: cell ? () => openEditor(`${dayLabel} · ${col.title}`, cell.rows) : null,
+        onkeydown: cell ? (e) => { if (e.key === "Enter") openEditor(`${dayLabel} · ${col.title}`, cell.rows); } : null,
+      }, cell ? fmt(cell.total) : el("span", { class: "empty-cell" }, "·"));
       if (cell && col.heat) {
         td.dataset.heat = "";
         td.style.setProperty("--heat", (0.05 + (cell.total / colMax[col.key]) * 0.2).toFixed(3));
@@ -320,22 +330,79 @@ function renderList(rows) {
           el("div", { class: "tx-cat" }, state.names[row.category] || row.category),
         ),
         el("span", { class: `tx-amount ${row.kind}` }, sign + money(row.amount)),
-        el("button", { type: "button", class: "icon-btn", title: "Удалить запись", "aria-label": "Удалить запись",
-          onclick: () => removeTransaction(row) }, "×"),
+        el("button", { type: "button", class: "icon-btn edit", title: "Изменить запись", "aria-label": "Изменить запись",
+          onclick: () => openEditor(label, [row]) }, "✎"),
       ));
     }
     box.append(group);
   }
 }
 
-async function removeTransaction(row) {
-  if (!window.confirm(`Удалить «${row.description || state.names[row.category]}» на ${money(row.amount)}?`)) return;
-  try {
-    await api(`/api/transactions/${row.id}`, { method: "DELETE" });
-    setStatus("Запись удалена");
-    await refresh();
-  } catch (error) {
-    setStatus(error.message, true);
+// ---------- Окно редактирования ----------
+
+const editor = { title: "", ids: [] };
+
+function openEditor(title, rows) {
+  editor.title = title;
+  editor.ids = rows.map((r) => r.id);
+  renderEditor();
+  const dialog = $("editor");
+  if (!dialog.open) dialog.showModal();
+}
+
+function renderEditor() {
+  const rows = state.rows.filter((r) => editor.ids.includes(r.id));
+  if (!rows.length) {
+    $("editor").close();
+    return;
+  }
+  $("editor-title").textContent = editor.title;
+  const box = $("editor-items");
+  box.replaceChildren();
+  for (const row of rows) {
+    const draft = { date: row.date, category: row.category, amount: row.amount, description: row.description };
+    const note = el("span", { class: "editor-note", role: "status" });
+    const remove = el("button", { type: "button", class: "btn ghost danger" }, "Удалить");
+    remove.addEventListener("click", async () => {
+      if (remove.dataset.armed !== "1") {
+        remove.dataset.armed = "1";
+        remove.textContent = "Точно удалить?";
+        return;
+      }
+      try {
+        await api(`/api/transactions/${row.id}`, { method: "DELETE" });
+        setStatus("Запись удалена");
+        await refresh();
+        renderEditor();
+      } catch (error) {
+        note.textContent = error.message;
+      }
+    });
+    const save = el("button", { type: "button", class: "btn primary" }, "Сохранить");
+    save.addEventListener("click", async () => {
+      if (!(draft.amount > 0)) return (note.textContent = "Сумма должна быть больше нуля");
+      save.disabled = true;
+      try {
+        await api(`/api/transactions/${row.id}`, { method: "PATCH", body: JSON.stringify(draft) });
+        await refresh();
+        renderEditor();
+        setStatus("Изменения сохранены");
+      } catch (error) {
+        note.textContent = error.message;
+        save.disabled = false;
+      }
+    });
+    box.append(el("div", { class: "editor-item" },
+      el("div", { class: "editor-fields" },
+        el("label", {}, "Дата", el("input", { type: "date", value: row.date, onchange: (e) => (draft.date = e.target.value) })),
+        el("label", {}, "Категория", categorySelect(row.category, (v) => (draft.category = v))),
+        el("label", {}, "Сумма, ₸", el("input", { type: "number", min: "0", step: "any", value: row.amount,
+          onchange: (e) => (draft.amount = Number(e.target.value)) })),
+        el("label", { class: "wide" }, "Описание", el("input", { type: "text", value: row.description, maxlength: "300",
+          onchange: (e) => (draft.description = e.target.value) })),
+      ),
+      el("div", { class: "editor-actions" }, note, remove, save),
+    ));
   }
 }
 
@@ -509,6 +576,8 @@ async function init() {
   $("auth-switch").addEventListener("click", () => setAuthMode(state.authMode === "login" ? "register" : "login"));
   $("logout").addEventListener("click", logout);
   $("import").addEventListener("click", () => $("import-file").click());
+  $("editor-close").addEventListener("click", () => $("editor").close());
+  $("editor").addEventListener("click", (e) => { if (e.target === $("editor")) $("editor").close(); });
   $("import-file").addEventListener("change", importFile);
   state.month = todayISO().slice(0, 7);
 

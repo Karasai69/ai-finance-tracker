@@ -127,3 +127,15 @@ def test_import_csv(client):
     bad = client.post("/api/import", json={"csv": "01.11.2026;;Казино;100"})
     assert bad.status_code == 422
     assert len(client.get("/api/transactions", params={"month": "2026-11"}).json()) == 2
+
+
+def test_login_is_rate_limited(make_client):
+    c = make_client()
+    c.post("/api/auth/register", json={"email": "a@b.kz", "password": "password123"})
+    for _ in range(5):
+        assert c.post("/api/auth/login", json={"email": "a@b.kz", "password": "wrongpass1"}).status_code == 401
+    blocked = c.post("/api/auth/login", json={"email": "a@b.kz", "password": "password123"})
+    assert blocked.status_code == 429
+    assert "Retry-After" in blocked.headers
+    # другой email с того же адреса не заблокирован
+    assert c.post("/api/auth/login", json={"email": "x@b.kz", "password": "password123"}).status_code == 401

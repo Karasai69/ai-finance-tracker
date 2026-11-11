@@ -197,6 +197,36 @@ textarea:focus, input:focus, select:focus { border-color: var(--focus); outline:
 
 .empty { color: var(--muted); padding: 24px 16px; margin: 0; }
 
+.sheet .clickable { cursor: pointer; }
+.sheet td.clickable:hover, .sheet td.clickable:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+.sheet th.clickable:hover { color: var(--green); text-decoration: underline; }
+.icon-btn.edit { font-size: 16px; }
+.icon-btn.edit:hover { background: var(--mint); color: var(--green); }
+
+/* ---------- Окно редактирования ---------- */
+
+.editor {
+  width: min(640px, calc(100vw - 24px)); max-height: calc(100vh - 48px);
+  border: 1px solid var(--rule); border-radius: 16px; padding: 0; color: var(--ink);
+}
+.editor::backdrop { background: rgba(28, 43, 38, .45); }
+.editor-head {
+  position: sticky; top: 0; background: #fff; z-index: 1;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid var(--rule);
+}
+.editor-head h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.editor-item { padding: 16px 20px; border-bottom: 1px solid var(--rule); }
+.editor-item:last-child { border-bottom: 0; }
+.editor-fields { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.editor-fields label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.editor-fields label.wide { grid-column: 1 / -1; }
+.editor-fields input, .editor-fields select { width: 100%; min-width: 0; color: var(--ink); }
+.editor-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; justify-content: flex-end; }
+.editor-note { margin-right: auto; color: var(--expense); font-size: 13px; }
+.btn.ghost.danger { color: var(--expense); }
+.btn.ghost.danger:hover { border-color: var(--expense); }
+
 /* ---------- Категории ---------- */
 
 .categories h2 { margin: 0 0 14px; font-size: 19px; font-weight: 600; }
@@ -217,6 +247,10 @@ textarea:focus, input:focus, select:focus { border-color: var(--focus); outline:
   .preview-item { grid-template-columns: 1fr 1fr; }
   .preview-item .desc { grid-column: 1 / 2; }
   .bar { grid-template-columns: 1fr auto; row-gap: 6px; }
+  .editor-fields { grid-template-columns: 1fr 1fr; }
+  .ledger-bar { flex-wrap: wrap; }
+  .ledger-actions { gap: 14px; font-size: 14px; }
+  .ledger-actions .export { white-space: nowrap; font-size: 14px; }
   .bar-track { grid-column: 1 / -1; grid-row: 2; }
   .sheet th, .sheet td { padding: 7px 9px; }
 }

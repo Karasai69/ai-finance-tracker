@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.models import User
+from app.ratelimit import login_limiter, register_limiter
 from app.schemas import AuthResponse, Credentials, UserOut
 from app.security import create_token, hash_password, read_token, verify_password
 
@@ -31,6 +32,18 @@ def _set_cookie(response: Response, token: str) -> None:
     )
 
 
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def _too_many(limiter, key: str, message: str) -> HTTPException:
+    return HTTPException(
+        status.HTTP_429_TOO_MANY_REQUESTS,
+        message,
+        headers={"Retry-After": str(limiter.retry_after(key))},
+    )
+
+
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     token = None
     header = request.headers.get("Authorization", "")
@@ -47,7 +60,11 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
 
 
 @router.post("/register", response_model=AuthResponse, status_code=201)
-def register(body: Credentials, response: Response, db: Session = Depends(get_db)):
+def register(body: Credentials, request: Request, response: Response, db: Session = Depends(get_db)):
+    key = _client_ip(request)
+    if register_limiter.is_blocked(key):
+        raise _too_many(register_limiter, key, "Слишком много регистраций, попробуйте позже")
+    register_limiter.hit(key)
     if db.scalar(select(User).where(User.email == body.email)):
         raise HTTPException(status.HTTP_409_CONFLICT, "Этот email уже зарегистрирован")
     user = User(email=body.email, password_hash=hash_password(body.password))
@@ -60,11 +77,17 @@ def register(body: Credentials, response: Response, db: Session = Depends(get_db
 
 
 @router.post("/login", response_model=AuthResponse)
-def login(body: Credentials, response: Response, db: Session = Depends(get_db)):
+def login(body: Credentials, request: Request, response: Response, db: Session = Depends(get_db)):
+    key = f"{_client_ip(request)}|{body.email}"
+    if login_limiter.is_blocked(key):
+        minutes = max(1, login_limiter.retry_after(key) // 60)
+        raise _too_many(login_limiter, key, f"Слишком много попыток входа. Попробуйте через {minutes} мин.")
     user = db.scalar(select(User).where(User.email == body.email))
     # Одинаковое сообщение, чтобы нельзя было узнать, какие email зарегистрированы
     if user is None or not verify_password(body.password, user.password_hash):
+        login_limiter.hit(key)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Неверный email или пароль")
+    login_limiter.reset(key)
     token = create_token(user.id)
     _set_cookie(response, token)
     return AuthResponse(user=UserOut.model_validate(user), access_token=token)
