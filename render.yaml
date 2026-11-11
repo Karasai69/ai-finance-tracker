@@ -5,6 +5,8 @@ services:
     name: ai-finance-tracker
     runtime: docker
     plan: free
+    # тот же регион, что у базы Neon (AWS US East 2, Ohio)
+    region: ohio
     healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL
