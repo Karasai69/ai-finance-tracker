@@ -64,7 +64,10 @@ def _extract_json(raw: str) -> dict:
 
 
 def items_from_ai_response(raw: str, today: date) -> list[ParsedItem]:
-    data = _extract_json(raw)
+    return items_from_data(_extract_json(raw), today)
+
+
+def items_from_data(data: dict, today: date) -> list[ParsedItem]:
     items = []
     for entry in data.get("items", []):
         if not isinstance(entry, dict):
@@ -78,25 +81,18 @@ def items_from_ai_response(raw: str, today: date) -> list[ParsedItem]:
     return items
 
 
-def parse_with_ai(text: str, today: date | None = None) -> list[ParsedItem]:
-    today = today or date.today()
+def chat_json(system: str, user: str) -> dict:
+    """Запрос к модели с ответом в JSON. Общий для разбора текста и разбора месяца."""
     if not settings.ai_enabled:
         raise AIParseError("ИИ не настроен: задайте AI_API_KEY и AI_MODEL в .env")
 
     from openai import OpenAI  # импорт здесь, чтобы тесты работали без пакета
 
-    client = OpenAI(
-        api_key=settings.ai_api_key,
-        base_url=settings.ai_base_url,
-        timeout=settings.ai_timeout,
-    )
+    client = OpenAI(api_key=settings.ai_api_key, base_url=settings.ai_base_url, timeout=settings.ai_timeout)
     try:
         response = client.chat.completions.create(
             model=settings.ai_model,
-            messages=[
-                {"role": "system", "content": build_system_prompt(today)},
-                {"role": "user", "content": text},
-            ],
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
             temperature=0,
             response_format={"type": "json_object"},
         )
@@ -109,6 +105,21 @@ def parse_with_ai(text: str, today: date | None = None) -> list[ParsedItem]:
         if status == 429:
             raise AIParseError("Превышен лимит запросов к ИИ, попробуйте через минуту") from exc
         raise AIParseError(f"Ошибка запроса к ИИ: {exc}") from exc
+    return _extract_json(response.choices[0].message.content or "")
 
-    content = response.choices[0].message.content or ""
-    return items_from_ai_response(content, today)
+
+def build_user_message(text: str, examples: dict[str, str] | None = None) -> str:
+    """Текст пользователя + его привычки: как он сам раньше относил похожие траты."""
+    if not examples:
+        return text
+    habits = "\n".join(f"- {desc} -> {cat}" for desc, cat in list(examples.items())[:40])
+    return (
+        "Так этот пользователь раньше сам относил похожие траты (учитывай в первую очередь):\n"
+        f"{habits}\n\nТекст для разбора:\n{text}"
+    )
+
+
+def parse_with_ai(text: str, today: date | None = None, examples: dict[str, str] | None = None) -> list[ParsedItem]:
+    today = today or date.today()
+    data = chat_json(build_system_prompt(today), build_user_message(text, examples))
+    return items_from_data(data, today)

@@ -90,6 +90,7 @@ function monthLabel(month) {
 }
 
 function setMonth(month) {
+  if (month !== state.month) resetReview();
   state.month = month;
   $("month-label").textContent = monthLabel(month);
   $("export").href = `/api/export.csv?month=${month}`;
@@ -149,7 +150,8 @@ async function parseText() {
     });
     state.preview = result.items;
     state.rawText = text;
-    $("source").textContent = result.source === "ai" ? "(разобрал ИИ)" : "(простой разбор)";
+    $("source").textContent = (result.source === "ai" ? "(разобрал ИИ" : "(простой разбор")
+      + (result.learned ? `, учтены ваши прошлые исправления: ${result.learned})` : ")");
     renderPreview();
     const notes = [];
     if (!result.items.length) notes.push("Не нашёл сумм в тексте. Добавьте число, например: такси 300");
@@ -406,6 +408,40 @@ function renderDebts() {
       ),
       form,
     ));
+  }
+}
+
+// ---------- Разбор месяца ----------
+
+function resetReview() {
+  $("review-points").hidden = true;
+  $("review-points").replaceChildren();
+  $("review-source").textContent = "";
+  $("review-hint").hidden = false;
+  $("review-run").textContent = "Разобрать месяц";
+}
+
+async function runReview() {
+  const button = $("review-run");
+  const month = state.month;
+  button.disabled = true;
+  button.textContent = "Думаю…";
+  try {
+    const result = await api(`/api/insights?month=${month}`, { method: "POST" });
+    if (month !== state.month) return;
+    $("review-hint").hidden = true;
+    $("review-points").replaceChildren(...result.points.map((p) => el("li", {}, p)));
+    $("review-points").hidden = false;
+    $("review-source").textContent = [
+      result.source === "ai" ? "Сформулировал ИИ по посчитанным приложением цифрам" : "Простые выводы без ИИ",
+      result.warning,
+    ].filter(Boolean).join(". ");
+    button.textContent = "Обновить разбор";
+  } catch (error) {
+    $("review-source").textContent = error.message;
+    button.textContent = "Разобрать месяц";
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -849,6 +885,7 @@ async function init() {
   $("open-limits").addEventListener("click", () => openLimits().catch((e) => setStatus(e.message, true)));
   $("limits-close").addEventListener("click", () => $("limits").close());
   $("limits-save").addEventListener("click", saveLimits);
+  $("review-run").addEventListener("click", runReview);
   $("editor").addEventListener("click", (e) => { if (e.target === $("editor")) $("editor").close(); });
   $("import-file").addEventListener("change", importFile);
   state.month = todayISO().slice(0, 7);

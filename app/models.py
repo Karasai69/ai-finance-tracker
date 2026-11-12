@@ -30,6 +30,8 @@ class Transaction(Base):
     counterparty: Mapped[str | None] = mapped_column(String(100), nullable=True)
     raw_text: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    # Когда запись последний раз меняли — нужно, чтобы свежее исправление побеждало старые записи
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, onupdate=func.now())
 
 
 class Budget(Base):

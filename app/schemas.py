@@ -49,6 +49,7 @@ class ParseResponse(BaseModel):
     items: list[ParsedItem]
     unparsed: list[str] = []
     warning: str | None = None
+    learned: int = 0  # сколько категорий подставлено по прошлым исправлениям пользователя
 
 
 class SaveRequest(BaseModel):
@@ -159,3 +160,9 @@ class AuthResponse(BaseModel):
     user: UserOut
     access_token: str
     token_type: str = "bearer"
+
+
+class Insights(BaseModel):
+    source: str  # "ai" или "rules"
+    points: list[str]
+    warning: str | None = None

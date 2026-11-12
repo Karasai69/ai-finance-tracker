@@ -216,3 +216,23 @@ def test_budgets_are_private(make_client):
     b.post("/api/auth/register", json={"email": "b@kz.kz", "password": "password123"})
     a.put("/api/budgets/transport", json={"limit": 1000})
     assert b.get("/api/budgets").json() == []
+
+
+def test_parse_learns_from_corrections(client):
+    row = _save(client, {"date": "2026-11-10", "amount": 900, "category": "products", "description": "шашлык"})[0]
+    first = client.post("/api/parse", json={"text": "шашлык 900", "date": "2026-11-12"}).json()
+    assert first["items"][0]["category"] == "products"  # так пользователь записал в прошлый раз
+
+    client.patch(f"/api/transactions/{row['id']}", json={"category": "cafe"})  # исправил
+    second = client.post("/api/parse", json={"text": "шашлык 1200", "date": "2026-11-12"}).json()
+    assert second["items"][0]["category"] == "cafe"
+
+
+def test_insights_without_ai(client):
+    empty = client.post("/api/insights", params={"month": "2026-11"}).json()
+    assert empty["source"] == "rules" and "расходов пока нет" in empty["points"][0]
+
+    _save(client, {"date": "2026-11-10", "amount": 900, "category": "cafe", "description": "шашлык"})
+    result = client.post("/api/insights", params={"month": "2026-11"}).json()
+    assert result["source"] == "rules"
+    assert "«Кафе и перекусы»" in result["points"][0]

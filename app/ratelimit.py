@@ -45,3 +45,5 @@ class RateLimiter:
 login_limiter = RateLimiter(max_attempts=5, window_seconds=15 * 60)
 # 10 регистраций в час с одного IP
 register_limiter = RateLimiter(max_attempts=10, window_seconds=60 * 60)
+# 10 разборов месяца в час на пользователя — бережём бесплатный лимит ИИ
+insights_limiter = RateLimiter(max_attempts=10, window_seconds=60 * 60)

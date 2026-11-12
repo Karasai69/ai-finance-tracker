@@ -17,8 +17,12 @@ from app.categories import CATEGORIES, EXPENSE, KINDS, PERSON_KINDS, kind_of, no
 from app.config import settings
 from app.database import get_db
 from app.importer import parse_csv
+from app.insights import ai_insights, build_facts, rule_insights
 from app.migrate import run_migrations
+from app.parser.ai import AIParseError
 from app.periods import compare_ranges, month_range
+from app.ratelimit import insights_limiter
+from app.personalize import build_examples
 from app.models import Budget, Transaction, User
 from app.schemas import (
     BudgetIn,
@@ -26,6 +30,7 @@ from app.schemas import (
     CategoryTotal,
     DayTotal,
     Debt,
+    Insights,
     ImportRequest,
     ImportResponse,
     ParseRequest,
@@ -95,10 +100,21 @@ def categories():
     }
 
 
+def user_examples(user: User, db: Session) -> dict[str, str]:
+    """Привычки пользователя «описание -> категория», свежие исправления первыми."""
+    rows = db.execute(
+        select(Transaction.description, Transaction.category)
+        .where(Transaction.user_id == user.id, Transaction.description != "")
+        .order_by(func.coalesce(Transaction.updated_at, Transaction.created_at).desc(), Transaction.id.desc())
+        .limit(500)
+    ).all()
+    return build_examples(rows)
+
+
 @app.post("/api/parse", response_model=ParseResponse)
-def parse_text(body: ParseRequest, user: User = Depends(get_current_user)):
+def parse_text(body: ParseRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Превращает свободный текст в записи. Ничего не сохраняет — только предпросмотр."""
-    return parser.parse(body.text, body.date)
+    return parser.parse(body.text, body.date, user_examples(user, db))
 
 
 @app.post("/api/transactions", response_model=list[TransactionOut], status_code=201)
@@ -314,6 +330,34 @@ def debts(user: User = Depends(get_current_user), db: Session = Depends(get_db))
         debt.last = row.date
         debt.balance = round(debt.lent - debt.repaid, 2)
     return sorted(people.values(), key=lambda d: (-d.balance, d.person))
+
+
+# ---------- Разбор месяца ----------
+
+@app.post("/api/insights", response_model=Insights)
+def insights(
+    month: str | None = Query(default=None, pattern=MONTH_PATTERN),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """3–4 вывода о месяце. Числа считает приложение, ИИ только формулирует."""
+    facts = build_facts(summary(month=month, user=user, db=db), debts(user=user, db=db))
+    if not facts["категории"] or not settings.ai_enabled:
+        return Insights(source="rules", points=rule_insights(facts))
+
+    key = str(user.id)
+    if insights_limiter.is_blocked(key):
+        return Insights(source="rules", points=rule_insights(facts),
+                        warning="Разбор от ИИ доступен 10 раз в час, показаны простые выводы")
+    insights_limiter.hit(key)
+    try:
+        points = ai_insights(facts)
+        if points:
+            return Insights(source="ai", points=points)
+        warning = "ИИ не ответил, показаны простые выводы"
+    except AIParseError as exc:
+        warning = f"{exc}. Показаны простые выводы"
+    return Insights(source="rules", points=rule_insights(facts), warning=warning)
 
 
 # ---------- Лимиты ----------
