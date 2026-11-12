@@ -22,14 +22,28 @@ def test_migrations_match_models(tmp_path):
     assert diff == [], f"Модели и миграции расходятся, создайте новую миграцию: {diff}"
 
 
-def test_existing_database_without_alembic_is_stamped(tmp_path):
-    """База, созданная через create_all до появления миграций, сохраняет данные."""
+def test_database_created_before_migrations_keeps_data(tmp_path):
+    """База, созданная через create_all до появления миграций (схема версии 0001):
+    помечается начальной версией, обновляется до последней и сохраняет данные."""
+    from alembic import command
+
+    from app.migrate import alembic_config
+
     engine = create_engine(f"sqlite:///{tmp_path / 'old.db'}")
-    Base.metadata.create_all(engine)
     with engine.begin() as connection:
-        connection.execute(text("INSERT INTO users (email, password_hash) VALUES ('a@b.kz', 'x')"))
+        command.upgrade(alembic_config(connection), "0001")
+        connection.execute(text("DROP TABLE alembic_version"))  # как будто миграций ещё не было
+        connection.execute(text("INSERT INTO users (id, email, password_hash) VALUES (1, 'a@b.kz', 'x')"))
+        connection.execute(text(
+            "INSERT INTO transactions (user_id, date, amount, category, kind, description) "
+            "VALUES (1, '2026-11-09', 22000, 'lend', 'lend', 'Алижан')"
+        ))
+
     with engine.begin() as connection:
         run_migrations(connection)
+
     with engine.connect() as connection:
-        assert inspect(connection).has_table("alembic_version")
+        assert inspect(connection).has_table("budgets")
         assert connection.execute(text("SELECT count(*) FROM users")).scalar() == 1
+        # имя должника перенесено из описания в новую колонку
+        assert connection.execute(text("SELECT counterparty FROM transactions")).scalar() == "Алижан"
