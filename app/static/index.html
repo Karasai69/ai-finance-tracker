@@ -4,7 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0f4f54">
+  <meta name="description" content="Учёт расходов обычным текстом: ИИ раскладывает траты по категориям, таблица и итоги считаются сами">
   <title>Финансы</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Финансы">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Arsenal+SC&family=IBM+Plex+Serif:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -22,6 +30,7 @@
           <button type="button" id="next-month" class="month-arrow" aria-label="Следующий месяц">›</button>
         </nav>
         <div class="account" id="account" hidden>
+          <button type="button" id="install" class="logout install">Установить приложение</button>
           <span id="user-email" class="serial"></span>
           <button type="button" id="logout" class="logout">Выйти</button>
         </div>
@@ -162,6 +171,27 @@
     <div class="editor-actions limits-actions">
       <span id="limits-note" class="editor-note" role="status"></span>
       <button type="button" id="limits-save" class="btn primary">Сохранить лимиты</button>
+    </div>
+  </dialog>
+
+  <dialog id="install-help" class="editor" aria-labelledby="install-title">
+    <div class="editor-head">
+      <h2 id="install-title">Установить приложение</h2>
+      <button type="button" id="install-close" class="icon-btn" aria-label="Закрыть">×</button>
+    </div>
+    <div class="install-body">
+      <p>Сайт можно добавить на главный экран: он откроется как приложение — с иконкой, без адресной строки.</p>
+      <h3>iPhone (Safari)</h3>
+      <ol>
+        <li>Нажмите кнопку «Поделиться» — квадрат со стрелкой внизу экрана.</li>
+        <li>Выберите «На экран „Домой“».</li>
+        <li>Нажмите «Добавить».</li>
+      </ol>
+      <h3>Android (Chrome)</h3>
+      <ol>
+        <li>Нажмите меню ⋮ в правом верхнем углу.</li>
+        <li>Выберите «Установить приложение» или «Добавить на главный экран».</li>
+      </ol>
     </div>
   </dialog>
 

@@ -236,3 +236,18 @@ def test_insights_without_ai(client):
     result = client.post("/api/insights", params={"month": "2026-11"}).json()
     assert result["source"] == "rules"
     assert "«Кафе и перекусы»" in result["points"][0]
+
+
+def test_pwa_files(make_client):
+    c = make_client()
+    sw = c.get("/sw.js")
+    assert sw.status_code == 200 and "javascript" in sw.headers["content-type"]
+    assert "__VERSION__" not in sw.text and sw.headers["cache-control"] == "no-cache"
+    version = c.get("/api/health").json()["version"]
+    assert f'"{version}"' in sw.text
+
+    manifest = c.get("/manifest.webmanifest")
+    assert manifest.status_code == 200 and manifest.json()["display"] == "standalone"
+    for icon in manifest.json()["icons"]:
+        assert c.get(icon["src"]).status_code == 200
+    assert c.get("/favicon.ico").status_code == 200

@@ -45,6 +45,7 @@ function el(tag, attrs = {}, ...children) {
 }
 
 async function api(path, options = {}) {
+  if (!navigator.onLine) throw new Error("Нет интернета — проверьте связь и попробуйте ещё раз");
   const response = await fetch(path, { headers: { "Content-Type": "application/json" }, ...options });
   if (response.status === 401 && !path.startsWith("/api/auth/")) {
     showAuth();
@@ -898,6 +899,38 @@ function drawRosette() {
     '<text x="100" y="109" text-anchor="middle" font-family="IBM Plex Serif, Georgia, serif" font-size="30" font-weight="700" fill="#E9F0EA">₸</text>';
 }
 
+// ---------- Установка как приложение ----------
+
+let installPrompt = null;
+
+function setupInstall() {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js").catch(() => { /* без service worker сайт тоже работает */ });
+  }
+  const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+  const button = $("install");
+  button.hidden = Boolean(standalone);
+  // Chrome и Android сами предлагают установку — перехватываем, чтобы показать по нашей кнопке
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    installPrompt = event;
+  });
+  window.addEventListener("appinstalled", () => {
+    button.hidden = true;
+    setStatus("Приложение установлено — ищите иконку «Финансы» на главном экране");
+  });
+  button.addEventListener("click", async () => {
+    if (installPrompt) {
+      installPrompt.prompt();
+      await installPrompt.userChoice;
+      installPrompt = null;
+    } else {
+      $("install-help").showModal(); // iPhone и браузеры без системного окна установки
+    }
+  });
+  $("install-close").addEventListener("click", () => $("install-help").close());
+}
+
 // ---------- Запуск ----------
 
 async function init() {
@@ -919,6 +952,7 @@ async function init() {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) parseText();
   });
   setupVoice();
+  setupInstall();
   drawRosette();
   drawGuilloche();
   let resizeTimer;

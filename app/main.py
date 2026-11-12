@@ -5,7 +5,7 @@ from datetime import date
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Query
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -77,6 +77,9 @@ def _versioned_index() -> str:
 
 
 INDEX_HTML = _versioned_index()
+# Версия приложения для service worker: меняется при любом изменении страницы, стилей или скрипта
+APP_VERSION = hashlib.sha256(INDEX_HTML.encode()).hexdigest()[:12]
+SW_JS = (STATIC_DIR / "sw.js").read_text(encoding="utf-8").replace("__VERSION__", APP_VERSION)
 
 
 @app.get("/", include_in_schema=False)
@@ -85,9 +88,25 @@ def index():
     return HTMLResponse(INDEX_HTML, headers={"Cache-Control": "no-cache"})
 
 
+@app.get("/sw.js", include_in_schema=False)
+def service_worker():
+    # Отдаётся из корня, чтобы управлять всем сайтом; браузер должен проверять его при каждом заходе
+    return Response(SW_JS, media_type="application/javascript", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/manifest.webmanifest", include_in_schema=False)
+def manifest():
+    return FileResponse(STATIC_DIR / "manifest.webmanifest", media_type="application/manifest+json")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return FileResponse(STATIC_DIR / "icons" / "favicon-32.png", media_type="image/png")
+
+
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "ai_enabled": settings.ai_enabled}
+    return {"status": "ok", "ai_enabled": settings.ai_enabled, "version": APP_VERSION}
 
 
 @app.get("/api/categories")
