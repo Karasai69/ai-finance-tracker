@@ -3,33 +3,55 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#1f6b4f">
+  <meta name="theme-color" content="#0f4f54">
   <title>Финансы</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Arsenal+SC&family=IBM+Plex+Serif:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <header class="top">
-    <div class="top-inner">
-      <span class="brand">Финансы</span>
-      <nav class="month" aria-label="Выбор месяца" hidden>
-        <button type="button" id="prev-month" class="month-arrow" aria-label="Предыдущий месяц">‹</button>
-        <span id="month-label" class="month-label"></span>
-        <button type="button" id="next-month" class="month-arrow" aria-label="Следующий месяц">›</button>
-      </nav>
-      <div class="account" id="account" hidden>
-        <span id="user-email" class="user-email"></span>
-        <button type="button" id="logout" class="logout">Выйти</button>
+  <header class="note">
+    <svg class="guilloche" id="guilloche" aria-hidden="true" preserveAspectRatio="none"></svg>
+    <div class="note-inner">
+      <div class="note-top">
+        <span class="brand">Финансы</span>
+        <nav class="month" aria-label="Выбор месяца" hidden>
+          <button type="button" id="prev-month" class="month-arrow" aria-label="Предыдущий месяц">‹</button>
+          <span id="month-label" class="month-label"></span>
+          <button type="button" id="next-month" class="month-arrow" aria-label="Следующий месяц">›</button>
+        </nav>
+        <div class="account" id="account" hidden>
+          <span id="user-email" class="serial"></span>
+          <button type="button" id="logout" class="logout">Выйти</button>
+        </div>
       </div>
+
+      <section id="intro" class="hero intro" hidden>
+        <p class="hero-label">Личный учёт денег</p>
+        <p class="intro-title">Пишите траты как в заметках — таблица, итоги и долги посчитаются сами</p>
+        <p class="intro-example">«такси 300, самса 500, брат прислал 10 000» → три записи по категориям</p>
+      </section>
+
+      <section id="hero" class="hero" aria-label="Итоги месяца" hidden>
+        <p class="hero-label">Остаток за месяц</p>
+        <strong id="sum-balance" class="hero-value">0 ₸</strong>
+        <dl class="flows">
+          <div><dt>Доходы</dt><dd id="sum-income">0 ₸</dd></div>
+          <div><dt>Расходы</dt><dd id="sum-expense">0 ₸</dd></div>
+          <div><dt>Дал в долг</dt><dd id="sum-lent">0 ₸</dd></div>
+          <div id="repaid-box" hidden><dt>Вернули долг</dt><dd id="sum-repaid">0 ₸</dd></div>
+        </dl>
+        <p id="compare" class="compare"></p>
+      </section>
     </div>
+    <svg class="rosette" id="rosette" viewBox="0 0 200 200" aria-hidden="true"></svg>
   </header>
 
   <section id="auth" class="auth" hidden>
     <form id="auth-form" class="auth-card" novalidate>
       <h1 id="auth-title">Вход</h1>
-      <p class="auth-lead">Записывайте расходы обычным текстом — таблица соберётся сама.</p>
+      <p class="auth-lead">Войдите, чтобы увидеть свои записи, или создайте аккаунт за минуту.</p>
       <label for="auth-email">Email</label>
       <input id="auth-email" type="email" autocomplete="email" placeholder="name@gmail.com" required>
       <label for="auth-password">Пароль</label>
@@ -45,25 +67,11 @@
   </section>
 
   <main id="app" hidden>
-    <section class="summary" aria-label="Итоги месяца">
-      <div class="balance">
-        <span class="balance-label">Остаток за месяц</span>
-        <strong id="sum-balance" class="balance-value">0 ₸</strong>
-      </div>
-      <dl class="totals">
-        <div><dt>Доходы</dt><dd id="sum-income" class="income">0 ₸</dd></div>
-        <div><dt>Расходы</dt><dd id="sum-expense" class="expense">0 ₸</dd></div>
-        <div><dt>Дал в долг</dt><dd id="sum-lent" class="lend">0 ₸</dd></div>
-        <div id="repaid-box" hidden><dt>Вернули долг</dt><dd id="sum-repaid" class="income">0 ₸</dd></div>
-      </dl>
-      <p id="compare" class="compare"></p>
-    </section>
-
     <section class="entry" aria-label="Новая запись">
-      <label for="text" class="entry-label">Что потратили или получили?</label>
-      <textarea id="text" rows="2"
-        placeholder="такси 300, овощи 896, брат прислал 10000, дал Султану в долг 5000"></textarea>
-      <div class="entry-actions">
+      <div class="entry-line">
+        <label for="text" class="entry-label">Что потратили?</label>
+        <textarea id="text" rows="1"
+          placeholder="такси 300, самса 500, брат прислал 10 000"></textarea>
         <input type="date" id="date" aria-label="Дата">
         <button type="button" id="voice" class="btn ghost" hidden>Голосом</button>
         <button type="button" id="parse" class="btn primary">Разобрать</button>
@@ -81,54 +89,59 @@
       </div>
     </section>
 
-    <section class="ledger" aria-label="Записи">
-      <div class="ledger-bar">
-        <div class="tabs" role="tablist">
-          <button type="button" role="tab" id="tab-table" class="tab" aria-selected="true">Таблица</button>
-          <button type="button" role="tab" id="tab-list" class="tab" aria-selected="false">Список</button>
-        </div>
-        <div class="ledger-actions">
-          <button type="button" id="import" class="export link-btn">Загрузить CSV</button>
-          <input type="file" id="import-file" accept=".csv,text/csv" hidden>
-          <a id="export" class="export" href="/api/export.csv">Скачать CSV</a>
-        </div>
+    <div class="layout">
+      <div class="main-col">
+        <section class="ledger" aria-labelledby="ledger-title">
+          <div class="ledger-bar">
+            <h2 id="ledger-title">Записи</h2>
+            <div class="tabs" role="tablist">
+              <button type="button" role="tab" id="tab-table" class="tab" aria-selected="true">Таблица</button>
+              <button type="button" role="tab" id="tab-list" class="tab" aria-selected="false">Список</button>
+            </div>
+            <div class="ledger-actions">
+              <button type="button" id="import" class="export link-btn">Загрузить CSV</button>
+              <input type="file" id="import-file" accept=".csv,text/csv" hidden>
+              <a id="export" class="export" href="/api/export.csv">Скачать CSV</a>
+            </div>
+          </div>
+          <div id="view-table" class="table-wrap" tabindex="0" aria-label="Таблица расходов по дням"></div>
+          <div id="view-list" class="list" hidden></div>
+        </section>
+
+        <section class="review" aria-labelledby="review-title">
+          <div class="section-head">
+            <h2 id="review-title">Разбор месяца</h2>
+            <button type="button" id="review-run" class="btn ghost">Разобрать месяц</button>
+          </div>
+          <p id="review-hint" class="review-hint">ИИ посмотрит на итоги месяца и коротко расскажет, куда ушли деньги и где можно сэкономить.</p>
+          <ul id="review-points" class="review-points" hidden></ul>
+          <p id="review-source" class="review-source"></p>
+        </section>
       </div>
-      <div id="view-table" class="table-wrap" tabindex="0" aria-label="Таблица расходов по дням"></div>
-      <div id="view-list" class="list" hidden></div>
-    </section>
 
-    <div class="insights">
-      <section class="chart-panel" aria-labelledby="daily-title">
-        <h2 id="daily-title">Расходы по дням</h2>
-        <div id="daily-chart" class="daily-chart"></div>
-      </section>
+      <aside class="side">
+        <section class="chart-panel" aria-labelledby="daily-title">
+          <h2 id="daily-title">Расходы по дням</h2>
+          <div id="daily-chart" class="daily-chart"></div>
+        </section>
 
-      <section id="debts" class="debts" aria-labelledby="debts-title" hidden>
-        <div class="section-head">
-          <h2 id="debts-title">Мне должны</h2>
-          <strong id="debts-total" class="lend"></strong>
-        </div>
-        <div id="debts-list"></div>
-      </section>
+        <section id="debts" class="debts" aria-labelledby="debts-title" hidden>
+          <div class="section-head">
+            <h2 id="debts-title">Мне должны</h2>
+            <strong id="debts-total" class="debts-total"></strong>
+          </div>
+          <div id="debts-list"></div>
+        </section>
+
+        <section class="categories" aria-labelledby="cat-title">
+          <div class="section-head">
+            <h2 id="cat-title">Куда ушли деньги</h2>
+            <button type="button" id="open-limits" class="link-btn">Лимиты</button>
+          </div>
+          <div id="categories" class="bars"></div>
+        </section>
+      </aside>
     </div>
-
-    <section class="review" aria-labelledby="review-title">
-      <div class="section-head">
-        <h2 id="review-title">Разбор месяца</h2>
-        <button type="button" id="review-run" class="btn ghost">Разобрать месяц</button>
-      </div>
-      <p id="review-hint" class="review-hint">ИИ посмотрит на итоги месяца и коротко расскажет, куда ушли деньги и где можно сэкономить.</p>
-      <ul id="review-points" class="review-points" hidden></ul>
-      <p id="review-source" class="review-source"></p>
-    </section>
-
-    <section class="categories" aria-labelledby="cat-title">
-      <div class="section-head">
-        <h2 id="cat-title">Куда ушли деньги</h2>
-        <button type="button" id="open-limits" class="link-btn">Настроить лимиты</button>
-      </div>
-      <div id="categories" class="bars"></div>
-    </section>
   </main>
 
   <dialog id="editor" class="editor" aria-labelledby="editor-title">

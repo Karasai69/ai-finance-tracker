@@ -174,6 +174,7 @@ async function savePreview() {
     state.preview = [];
     renderPreview();
     $("text").value = "";
+    $("text").style.height = "";
     const savedMonth = items[0].date.slice(0, 7);
     if (savedMonth !== state.month) {
       state.month = savedMonth;
@@ -233,12 +234,13 @@ function limitWarnings(categories) {
 
 function renderSummary(summary) {
   state.summary = summary;
-  $("sum-income").textContent = money(summary.income);
-  $("sum-expense").textContent = money(summary.expense);
+  $("sum-income").textContent = (summary.income ? "+" : "") + money(summary.income);
+  $("sum-expense").textContent = (summary.expense ? "−" : "") + money(summary.expense);
   $("sum-lent").textContent = money(summary.lent);
   $("sum-repaid").textContent = money(summary.repaid);
   $("repaid-box").hidden = !summary.repaid;
-  $("sum-balance").textContent = money(summary.balance);
+  // Знак ₸ — отдельно, мельче и цветом охры, как номинал на купюре
+  $("sum-balance").replaceChildren(fmt(summary.balance).replace("-", "−"), el("span", { class: "cur" }, "₸"));
   $("sum-balance").classList.toggle("negative", summary.balance < 0);
   renderComparison(summary);
   renderDailyChart(summary);
@@ -790,6 +792,9 @@ function setupVoice() {
 function showAuth() {
   state.user = null;
   $("app").hidden = true;
+  $("hero").hidden = true;
+  $("intro").hidden = false;
+  requestAnimationFrame(drawGuilloche);
   document.querySelector(".month").hidden = true;
   $("account").hidden = true;
   $("auth").hidden = false;
@@ -800,9 +805,12 @@ function showApp(user) {
   state.user = user;
   $("auth").hidden = true;
   $("app").hidden = false;
+  $("hero").hidden = false;
+  $("intro").hidden = true;
   document.querySelector(".month").hidden = false;
   $("account").hidden = false;
   $("user-email").textContent = user.email;
+  requestAnimationFrame(drawGuilloche);
   setMonth(state.month || todayISO().slice(0, 7));
 }
 
@@ -855,6 +863,41 @@ async function logout() {
   showAuth();
 }
 
+// ---------- Узор купюры ----------
+
+// Гильош — переплетение синусоид, как на банкнотах. Рисуется под ширину шапки.
+function drawGuilloche() {
+  const svg = $("guilloche");
+  const W = Math.max(600, Math.round(svg.clientWidth || window.innerWidth));
+  const H = Math.max(200, Math.round(svg.clientHeight || 330));
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  let paths = "";
+  for (let k = 0; k < 26; k++) {
+    let d = "";
+    for (let x = 0; x <= W; x += 6) {
+      const y = H * 0.55 + Math.sin(x / 70 + k * 0.24) * (H * 0.11 + k * 2.2) + Math.sin(x / 23 + k) * 6;
+      d += `${x ? "L" : "M"}${x},${y.toFixed(1)}`;
+    }
+    paths += `<path d="${d}" fill="none" stroke="${k % 3 ? "#2C7B78" : "#C9A15A"}" stroke-width="0.6"/>`;
+  }
+  svg.innerHTML = paths;
+}
+
+function drawRosette() {
+  let paths = "";
+  for (let k = 0; k < 36; k++) {
+    let d = "";
+    for (let t = 0; t <= 360; t += 3) {
+      const a = (t * Math.PI) / 180;
+      const r = 60 + 22 * Math.sin(7 * a + k * 0.17);
+      d += `${t ? "L" : "M"}${(100 + r * Math.cos(a + k * 0.05)).toFixed(1)},${(100 + r * Math.sin(a + k * 0.05)).toFixed(1)}`;
+    }
+    paths += `<path d="${d}" fill="none" stroke="#D8B46A" stroke-width="0.5" opacity=".8"/>`;
+  }
+  $("rosette").innerHTML = paths +
+    '<text x="100" y="109" text-anchor="middle" font-family="IBM Plex Serif, Georgia, serif" font-size="30" font-weight="700" fill="#E9F0EA">₸</text>';
+}
+
 // ---------- Запуск ----------
 
 async function init() {
@@ -866,14 +909,25 @@ async function init() {
   $("next-month").addEventListener("click", () => setMonth(shiftMonth(state.month, 1)));
   $("tab-table").addEventListener("click", () => setView("table"));
   $("tab-list").addEventListener("click", () => setView("list"));
+  const grow = () => {
+    const t = $("text");
+    t.style.height = "auto";
+    t.style.height = `${t.scrollHeight}px`;
+  };
+  $("text").addEventListener("input", grow);
   $("text").addEventListener("keydown", (e) => {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) parseText();
   });
   setupVoice();
+  drawRosette();
+  drawGuilloche();
   let resizeTimer;
   window.addEventListener("resize", () => {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => state.summary && renderDailyChart(state.summary), 150);
+    resizeTimer = setTimeout(() => {
+      drawGuilloche();
+      if (state.summary) renderDailyChart(state.summary);
+    }, 150);
   });
   setView(storage.get("view") === "list" ? "list" : "table");
 

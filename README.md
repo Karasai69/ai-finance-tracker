@@ -41,7 +41,7 @@
 | База данных | PostgreSQL (в продакшене и CI), SQLite (локально) |
 | Авторизация | JWT в httpOnly cookie, хеширование паролей scrypt, ограничение попыток входа |
 | ИИ | LLM через OpenAI-совместимый API (Groq, Gemini, OpenAI) |
-| Frontend | HTML, CSS, JavaScript, Web Speech API |
+| Frontend | HTML, CSS, JavaScript без фреймворков, SVG-графики, Web Speech API |
 | Инфраструктура | Docker, Docker Compose, GitHub Actions, Render, Neon |
 | Тесты | pytest: разбор текста, ответы ИИ, авторизация, изоляция данных пользователей |
 
