@@ -14,7 +14,12 @@ def money(value: float) -> str:
     return f"{round(value):,}".replace(",", " ") + " ₸"
 
 
-def build_facts(summary: Summary, debts: list[Debt]) -> dict:
+# Категории, по которым ИИ не даёт советов экономить
+NO_ADVICE = {"charity", "gift", "ten_percent", "sport", "books"}
+
+
+def build_facts(summary: Summary, debts: list[Debt], counts: dict[str, int] | None = None) -> dict:
+    counts = counts or {}
     expenses = [c for c in summary.by_category if c.kind == "expense" and c.total > 0]
     month_name = MONTHS_PREP[int(summary.month[5:7]) - 1]
     prev_name = MONTHS_PREP[int(summary.prev_month[5:7]) - 1]
@@ -32,8 +37,10 @@ def build_facts(summary: Summary, debts: list[Debt]) -> dict:
         },
         "категории": [
             {
+                "ключ": c.category,
                 "название": c.name,
                 "сумма": round(c.total),
+                "записей": counts.get(c.category, 0),
                 "доля_процентов": round(c.total / summary.expense * 100) if summary.expense else 0,
                 "прошлый_месяц": round(c.prev_total),
                 "лимит": round(c.limit) if c.limit else None,
@@ -74,15 +81,49 @@ def rule_insights(facts: dict) -> list[str]:
     return points[:4]
 
 
-SYSTEM_PROMPT = """Ты помощник по личным финансам. Тебе дают готовые факты о месяце в JSON —
-все числа уже посчитаны, не пересчитывай и не придумывай новые.
-Напиши 3–4 коротких вывода на русском языке (каждый — одно предложение до 25 слов):
-- куда ушла основная часть денег;
-- что изменилось по сравнению с прошлым месяцем (если есть данные);
-- превышенные лимиты (если есть);
-- один конкретный и выполнимый совет, где можно сэкономить.
-Не осуждай траты, не давай советов по благотворительности, подаркам и религиозным расходам,
-не советуй инвестиции. Суммы пиши в тенге со знаком ₸.
+def ai_payload(facts: dict) -> dict:
+    """Факты для модели: суммы уже отформатированы, отсутствующих данных просто нет —
+    модели нечего «додумывать» (например, сравнение с пустым прошлым месяцем)."""
+    payload: dict = {
+        "месяц": facts["месяц"],
+        "доходы": money(facts["доходы"]),
+        "расходы": money(facts["расходы"]),
+        "категории_расходов": [
+            {"название": c["название"], "сумма": money(c["сумма"]), "доля": f"{c['доля_процентов']}%",
+             "сколько_раз": c["записей"]}
+            for c in facts["категории"]
+        ],
+    }
+    cmp = facts["сравнение"]
+    if cmp["прошлый_месяц"]:
+        payload["сравнение_с_прошлым_месяцем"] = {
+            "период": cmp["период"], "сейчас": money(cmp["сейчас"]),
+            "в " + facts["прошлый_месяц"]: money(cmp["прошлый_месяц"]),
+        }
+    limits = [c for c in facts["категории"] if c["лимит"]]
+    if limits:
+        payload["лимиты"] = [
+            {"название": c["название"], "лимит": money(c["лимит"]), "потрачено": money(c["сумма"]),
+             "превышен": c["сумма"] > c["лимит"]}
+            for c in limits
+        ]
+    advice = [c for c in facts["категории"] if c["ключ"] not in NO_ADVICE and c["записей"] >= 2]
+    if advice:
+        payload["где_можно_советовать_экономию"] = [
+            {"название": c["название"], "сумма": money(c["сумма"]), "сколько_раз": c["записей"]} for c in advice
+        ]
+    return payload
+
+
+SYSTEM_PROMPT = """Ты помощник по личным финансам. Тебе дают готовые факты о месяце в JSON.
+Все суммы уже посчитаны и отформатированы — копируй их как есть («22 000 ₸»), не пересчитывай и не придумывай.
+Напиши 3–4 коротких вывода на русском языке, каждый — одно предложение до 25 слов:
+1. Куда ушла основная часть денег.
+2. Только если в фактах есть «сравнение_с_прошлым_месяцем» — что изменилось. Если его нет, про прошлый месяц не пиши.
+3. Только если в фактах есть «лимиты» — про превышенные или почти исчерпанные. Если лимитов нет, про лимиты не пиши.
+4. Только если есть «где_можно_советовать_экономию» — один конкретный совет по самой частой из этих трат,
+   с примерной суммой экономии. Если такого списка нет, совет не давай.
+Никогда не оценивай и не советуй сокращать благотворительность, подарки, спорт и учёбу. Не советуй инвестиции.
 Ответь только JSON: {"points": ["...", "..."]}"""
 
 
@@ -91,6 +132,6 @@ def ai_insights(facts: dict) -> list[str]:
 
     from app.parser.ai import chat_json
 
-    data = chat_json(SYSTEM_PROMPT, json.dumps(facts, ensure_ascii=False))
+    data = chat_json(SYSTEM_PROMPT, json.dumps(ai_payload(facts), ensure_ascii=False))
     points = [str(p).strip() for p in data.get("points", []) if str(p).strip()]
     return points[:5]

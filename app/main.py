@@ -341,7 +341,14 @@ def insights(
     db: Session = Depends(get_db),
 ):
     """3–4 вывода о месяце. Числа считает приложение, ИИ только формулирует."""
-    facts = build_facts(summary(month=month, user=user, db=db), debts(user=user, db=db))
+    month = month or current_month()
+    start, end = month_range(month)
+    counts = dict(db.execute(
+        select(Transaction.category, func.count())
+        .where(Transaction.user_id == user.id, Transaction.date >= start, Transaction.date < end)
+        .group_by(Transaction.category)
+    ).all())
+    facts = build_facts(summary(month=month, user=user, db=db), debts(user=user, db=db), counts)
     if not facts["категории"] or not settings.ai_enabled:
         return Insights(source="rules", points=rule_insights(facts))
 

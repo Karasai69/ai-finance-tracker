@@ -38,3 +38,24 @@ def test_rule_insights():
 
 def test_empty_month():
     assert rule_insights(build_facts(make_summary(by_category=[], expense=0), [])) == ["В ноябре расходов пока нет."]
+
+
+def test_ai_payload_hides_missing_data_and_formats_money():
+    from app.insights import ai_payload
+
+    facts = build_facts(make_summary(prev_expense=0), DEBTS, {"sport": 1, "transport": 12})
+    payload = ai_payload(facts)
+    assert "сравнение_с_прошлым_месяцем" not in payload  # прошлый месяц пустой
+    assert payload["категории_расходов"][0]["сумма"] == "22 000 ₸"
+    assert payload["лимиты"][0]["превышен"] is True
+    # спорт не предлагаем сокращать, такси — частая трата
+    assert [c["название"] for c in payload["где_можно_советовать_экономию"]] == ["Транспорт и такси"]
+
+
+def test_ai_payload_without_limits():
+    from app.insights import ai_payload
+
+    summary = make_summary()
+    for c in summary.by_category:
+        c.limit = None
+    assert "лимиты" not in ai_payload(build_facts(summary, []))
