@@ -145,3 +145,74 @@ def test_index_links_versioned_assets_and_is_not_cached(make_client):
     r = make_client().get("/")
     assert r.headers["cache-control"] == "no-cache"
     assert "/static/app.js?v=" in r.text and "/static/style.css?v=" in r.text
+
+
+# ---------- Долги, лимиты, сравнение ----------
+
+def _save(client, *items):
+    r = client.post("/api/transactions", json={"items": list(items)})
+    assert r.status_code == 201, r.text
+    return r.json()
+
+
+def test_debts_by_person_across_months(client):
+    _save(
+        client,
+        {"date": "2026-10-20", "amount": 10000, "category": "lend", "counterparty": "Султан"},
+        {"date": "2026-11-09", "amount": 22000, "category": "lend", "counterparty": "Алижан"},
+        {"date": "2026-11-10", "amount": 4000, "category": "repaid", "counterparty": "султан"},
+        {"date": "2026-11-11", "amount": 22000, "category": "repaid", "counterparty": "Алижан"},
+    )
+    debts = {d["person"]: d for d in client.get("/api/debts").json()}
+    assert debts["Султан"]["balance"] == 6000
+    assert debts["Султан"]["since"] == "2026-10-20"
+    assert debts["Алижан"]["balance"] == 0
+
+    summary = client.get("/api/summary", params={"month": "2026-11"}).json()
+    assert summary["lent"] == 22000 and summary["repaid"] == 26000
+    assert summary["balance"] == 4000  # 0 доходов - 0 расходов - 22000 + 26000
+
+
+def test_counterparty_only_for_debts(client):
+    row = _save(client, {"date": "2026-11-10", "amount": 300, "category": "transport", "counterparty": "Али"})[0]
+    assert row["counterparty"] is None
+    updated = client.patch(f"/api/transactions/{row['id']}", json={"category": "lend", "counterparty": "Али"}).json()
+    assert updated["kind"] == "lend" and updated["counterparty"] == "Али"
+
+
+def test_budgets_set_update_delete_and_in_summary(client):
+    assert client.put("/api/budgets/income", json={"limit": 100}).status_code == 400
+    assert client.put("/api/budgets/transport", json={"limit": 10000}).json()[0]["limit"] == 10000
+    assert client.put("/api/budgets/transport", json={"limit": 8000}).json()[0]["limit"] == 8000
+    client.put("/api/budgets/cafe", json={"limit": 5000})
+    _save(client, {"date": "2026-11-10", "amount": 9000, "category": "transport"})
+
+    cats = {c["category"]: c for c in client.get("/api/summary", params={"month": "2026-11"}).json()["by_category"]}
+    assert cats["transport"]["limit"] == 8000 and cats["transport"]["total"] == 9000
+    assert cats["cafe"]["total"] == 0 and cats["cafe"]["limit"] == 5000  # лимит без трат тоже виден
+
+    assert client.put("/api/budgets/transport", json={"limit": None}).json() == [
+        {"category": "cafe", "name": "Кафе и перекусы", "limit": 5000}
+    ]
+
+
+def test_summary_compares_with_previous_month(client):
+    _save(
+        client,
+        {"date": "2026-09-05", "amount": 1000, "category": "products"},
+        {"date": "2026-10-05", "amount": 3000, "category": "products"},
+        {"date": "2026-10-06", "amount": 500, "category": "transport"},
+    )
+    summary = client.get("/api/summary", params={"month": "2026-10"}).json()
+    assert summary["prev_month"] == "2026-09" and summary["compare_days"] is None
+    assert summary["expense_to_date"] == 3500 and summary["prev_expense"] == 1000
+    cats = {c["category"]: c for c in summary["by_category"]}
+    assert cats["products"]["prev_total"] == 1000 and cats["transport"]["prev_total"] == 0
+
+
+def test_budgets_are_private(make_client):
+    a, b = make_client(), make_client()
+    a.post("/api/auth/register", json={"email": "a@kz.kz", "password": "password123"})
+    b.post("/api/auth/register", json={"email": "b@kz.kz", "password": "password123"})
+    a.put("/api/budgets/transport", json={"limit": 1000})
+    assert b.get("/api/budgets").json() == []

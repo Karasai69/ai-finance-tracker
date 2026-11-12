@@ -7,7 +7,7 @@
 import re
 from datetime import date
 
-from app.categories import DEFAULT_CATEGORY, KEYWORDS, kind_of
+from app.categories import DEFAULT_CATEGORY, KEYWORDS, PERSON_KINDS, kind_of
 from app.schemas import ParsedItem
 
 # 10 000 | 10000 | 420,50 | 1.5 ; затем необязательный множитель: к, k, тыс
@@ -53,6 +53,20 @@ def _clean_description(text: str) -> str:
     return " ".join(words).strip(" -—:.")
 
 
+def guess_person(text: str) -> str | None:
+    """Имя человека — первое слово с заглавной буквы: «дал Султану в долг» -> «Султан».
+
+    Простое правило для дательного падежа: «Султану», «Мадияру» -> без последней «у/ю».
+    ИИ справляется с именами точнее, это запасной вариант.
+    """
+    for word in WORD_RE.findall(text):
+        if word[:1].isupper() and word[:1].isalpha():
+            if len(word) > 4 and word[-1] in "уюУЮ":
+                word = word[:-1]
+            return word
+    return None
+
+
 def parse_text(text: str, today: date | None = None) -> tuple[list[ParsedItem], list[str]]:
     """Возвращает (распознанные записи, куски текста без суммы)."""
     today = today or date.today()
@@ -81,13 +95,15 @@ def parse_text(text: str, today: date | None = None) -> tuple[list[ParsedItem], 
                 continue
             description = _clean_description(piece) or chunk
             category = guess_category(description)
+            kind = kind_of(category)
             items.append(
                 ParsedItem(
                     date=today,
                     amount=amount,
                     category=category,
-                    kind=kind_of(category),
+                    kind=kind,
                     description=description,
+                    counterparty=guess_person(piece) if kind in PERSON_KINDS else None,
                 )
             )
     return items, unparsed

@@ -1,6 +1,6 @@
 """Импорт записей из CSV — в том же формате, что и выгрузка «Скачать CSV».
 
-Формат: Дата;Тип;Категория;Сумма;Описание
+Формат: Дата;Тип;Категория;Сумма;Описание;Кто (необязательно)
 - Дата: 2026-11-01, 01.11.2026 или 01.11.26
 - Тип: необязателен, тип всегда определяется по категории
 - Категория: название («Транспорт и такси») или ключ («transport»)
@@ -66,6 +66,7 @@ def parse_csv(text: str) -> tuple[list[ParsedItem], list[str]]:
                     category=_parse_category(row[2]),
                     amount=row[3],
                     description=row[4].strip() if len(row) > 4 else "",
+                    counterparty=row[5].strip() if len(row) > 5 else None,
                 )
             )
         except ValueError as exc:  # ValidationError тоже наследует ValueError

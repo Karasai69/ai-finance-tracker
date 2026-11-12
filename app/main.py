@@ -13,15 +13,19 @@ from sqlalchemy.orm import Session
 from app import parser
 from app.auth import get_current_user
 from app.auth import router as auth_router
-from app.categories import CATEGORIES, KINDS, kind_of, normalize_category
+from app.categories import CATEGORIES, EXPENSE, KINDS, PERSON_KINDS, kind_of, normalize_category
 from app.config import settings
 from app.database import get_db
 from app.importer import parse_csv
 from app.migrate import run_migrations
-from app.models import Transaction, User
+from app.periods import compare_ranges, month_range
+from app.models import Budget, Transaction, User
 from app.schemas import (
+    BudgetIn,
+    BudgetOut,
     CategoryTotal,
     DayTotal,
+    Debt,
     ImportRequest,
     ImportResponse,
     ParseRequest,
@@ -41,13 +45,6 @@ run_migrations()
 app = FastAPI(title="AI Finance Tracker", version="0.2.0")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.include_router(auth_router)
-
-
-def month_range(month: str) -> tuple[date, date]:
-    year, mon = map(int, month.split("-"))
-    start = date(year, mon, 1)
-    end = date(year + 1, 1, 1) if mon == 12 else date(year, mon + 1, 1)
-    return start, end
 
 
 def current_month() -> str:
@@ -116,6 +113,7 @@ def create_transactions(
             category=item.category,
             kind=item.kind,
             description=item.description,
+            counterparty=item.counterparty,
             raw_text=body.raw_text,
         )
         for item in body.items
@@ -144,6 +142,7 @@ def import_csv(body: ImportRequest, user: User = Depends(get_current_user), db: 
             category=item.category,
             kind=item.kind,
             description=item.description,
+            counterparty=item.counterparty,
             raw_text="импорт CSV",
         )
         for item in items
@@ -186,6 +185,11 @@ def update_transaction(
         data["kind"] = kind_of(data["category"])
     for field, value in data.items():
         setattr(row, field, value)
+    # Имя человека имеет смысл только для долгов
+    if row.kind not in PERSON_KINDS:
+        row.counterparty = None
+    elif row.counterparty is not None:
+        row.counterparty = row.counterparty.strip() or None
     db.commit()
     db.refresh(row)
     return row
@@ -201,6 +205,11 @@ def delete_transaction(
     return Response(status_code=204)
 
 
+def _sum_by(db: Session, column, *where):
+    rows = db.execute(select(column, func.sum(Transaction.amount)).where(*where).group_by(column)).all()
+    return {key: float(total or 0) for key, total in rows}
+
+
 @app.get("/api/summary", response_model=Summary)
 def summary(
     month: str | None = Query(default=None, pattern=MONTH_PATTERN),
@@ -209,30 +218,44 @@ def summary(
 ):
     month = month or current_month()
     start, end = month_range(month)
-    scope = (Transaction.user_id == user.id, Transaction.date >= start, Transaction.date < end)
+    mine = Transaction.user_id == user.id
+    scope = (mine, Transaction.date >= start, Transaction.date < end)
 
-    by_category_rows = db.execute(
-        select(Transaction.category, func.sum(Transaction.amount))
-        .where(*scope)
-        .group_by(Transaction.category)
-        .order_by(func.sum(Transaction.amount).desc())
-    ).all()
-    by_category = [
-        CategoryTotal(
-            category=cat,
-            name=CATEGORIES.get(cat, CATEGORIES["other"])[0],
-            kind=kind_of(cat),
-            total=float(total or 0),
-        )
-        for cat, total in by_category_rows
-    ]
+    totals = _sum_by(db, Transaction.category, *scope)
+    by_kind = _sum_by(db, Transaction.kind, *scope)
 
-    by_kind = {
-        kind: float(total or 0)
-        for kind, total in db.execute(
-            select(Transaction.kind, func.sum(Transaction.amount)).where(*scope).group_by(Transaction.kind)
-        ).all()
+    cur_start, cur_end, prev_start, prev_end, compare_days = compare_ranges(month, date.today())
+    expense_only = Transaction.kind == EXPENSE
+    cur_by_cat = _sum_by(db, Transaction.category, mine, expense_only,
+                         Transaction.date >= cur_start, Transaction.date < cur_end)
+    prev_by_cat = _sum_by(db, Transaction.category, mine, expense_only,
+                          Transaction.date >= prev_start, Transaction.date < prev_end)
+    limits = {
+        b.category: float(b.monthly_limit)
+        for b in db.scalars(select(Budget).where(Budget.user_id == user.id))
     }
+
+    by_category = sorted(
+        (
+            CategoryTotal(
+                category=cat,
+                name=CATEGORIES.get(cat, CATEGORIES["other"])[0],
+                kind=kind_of(cat),
+                total=total,
+                limit=limits.get(cat),
+                prev_total=prev_by_cat.get(cat, 0.0),
+            )
+            for cat, total in totals.items()
+        ),
+        key=lambda c: -c.total,
+    )
+    # Категории с лимитом, но без трат в этом месяце — тоже показываем
+    for cat, limit in limits.items():
+        if cat not in totals:
+            by_category.append(
+                CategoryTotal(category=cat, name=CATEGORIES.get(cat, CATEGORIES["other"])[0],
+                              kind=kind_of(cat), total=0, limit=limit, prev_total=prev_by_cat.get(cat, 0.0))
+            )
 
     days: dict[date, DayTotal] = {}
     for day, kind, total in db.execute(
@@ -244,21 +267,82 @@ def summary(
         entry = days.setdefault(day, DayTotal(date=day, expense=0, income=0))
         if kind == "income":
             entry.income += float(total or 0)
-        elif kind == "expense":
+        elif kind == EXPENSE:
             entry.expense += float(total or 0)
 
     income = by_kind.get("income", 0.0)
-    expense = by_kind.get("expense", 0.0)
+    expense = by_kind.get(EXPENSE, 0.0)
     lent = by_kind.get("lend", 0.0)
+    repaid = by_kind.get("repaid", 0.0)
     return Summary(
         month=month,
         income=income,
         expense=expense,
         lent=lent,
-        balance=round(income - expense - lent, 2),
+        repaid=repaid,
+        balance=round(income - expense - lent + repaid, 2),
         by_category=by_category,
         by_day=list(days.values()),
+        prev_month=prev_start.strftime("%Y-%m"),
+        compare_days=compare_days,
+        expense_to_date=sum(cur_by_cat.values()),
+        prev_expense=sum(prev_by_cat.values()),
     )
+
+
+# ---------- Долги ----------
+
+@app.get("/api/debts", response_model=list[Debt])
+def debts(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Кто сколько должен — по всем месяцам. Имена сравниваются без учёта регистра."""
+    rows = db.scalars(
+        select(Transaction)
+        .where(Transaction.user_id == user.id, Transaction.kind.in_(sorted(PERSON_KINDS)))
+        .order_by(Transaction.date, Transaction.id)
+    ).all()
+    people: dict[str, Debt] = {}
+    for row in rows:
+        name = (row.counterparty or "").strip() or "Без имени"
+        debt = people.get(name.casefold())
+        if debt is None:
+            debt = people[name.casefold()] = Debt(person=name, lent=0, repaid=0, balance=0, since=row.date, last=row.date)
+        amount = float(row.amount)
+        if row.kind == "lend":
+            debt.lent += amount
+        else:
+            debt.repaid += amount
+        debt.last = row.date
+        debt.balance = round(debt.lent - debt.repaid, 2)
+    return sorted(people.values(), key=lambda d: (-d.balance, d.person))
+
+
+# ---------- Лимиты ----------
+
+@app.get("/api/budgets", response_model=list[BudgetOut])
+def list_budgets(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return [
+        BudgetOut(category=b.category, name=CATEGORIES.get(b.category, CATEGORIES["other"])[0], limit=float(b.monthly_limit))
+        for b in db.scalars(select(Budget).where(Budget.user_id == user.id).order_by(Budget.category))
+    ]
+
+
+@app.put("/api/budgets/{category}", response_model=list[BudgetOut])
+def set_budget(
+    category: str, body: BudgetIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """Задать месячный лимит. Пустой или нулевой лимит удаляет его."""
+    if category not in CATEGORIES or kind_of(category) != EXPENSE:
+        raise HTTPException(400, "Лимит можно задать только для категории расходов")
+    budget = db.scalar(select(Budget).where(Budget.user_id == user.id, Budget.category == category))
+    if not body.limit:
+        if budget is not None:
+            db.delete(budget)
+    elif budget is None:
+        db.add(Budget(user_id=user.id, category=category, monthly_limit=body.limit))
+    else:
+        budget.monthly_limit = body.limit
+    db.commit()
+    return list_budgets(user=user, db=db)
 
 
 @app.get("/api/export.csv")
@@ -271,7 +355,7 @@ def export_csv(
     month = month or current_month()
     buffer = io.StringIO()
     writer = csv.writer(buffer, delimiter=";")
-    writer.writerow(["Дата", "Тип", "Категория", "Сумма", "Описание"])
+    writer.writerow(["Дата", "Тип", "Категория", "Сумма", "Описание", "Кто"])
     for row in reversed(_month_rows(month, user, db)):
         writer.writerow(
             [
@@ -280,6 +364,7 @@ def export_csv(
                 CATEGORIES.get(row.category, CATEGORIES["other"])[0],
                 str(row.amount).replace(".", ","),
                 row.description,
+                row.counterparty or "",
             ]
         )
     # BOM, чтобы Excel правильно открыл кириллицу

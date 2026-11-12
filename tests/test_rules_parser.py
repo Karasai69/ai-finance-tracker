@@ -67,3 +67,11 @@ def test_food_and_clean_description():
 def test_instant_noodles_is_cafe():
     items, _ = parse("дошик 300")
     assert items == [("cafe", 300, "expense")]
+
+
+def test_lend_and_repaid_get_person():
+    items, _ = parse_text("дал Султану в долг 10000, Алижан вернул 5000", TODAY)
+    assert [(i.category, i.amount, i.counterparty) for i in items] == [
+        ("lend", 10000, "Султан"),
+        ("repaid", 5000, "Алижан"),
+    ]

@@ -30,7 +30,7 @@ def build_system_prompt(today: date) -> str:
 Сегодня {today.isoformat()} ({today.strftime('%A')}). «Вчера» = {(today - timedelta(days=1)).isoformat()}.
 
 Разбей текст на отдельные операции и верни ТОЛЬКО JSON вида:
-{{"items": [{{"date": "YYYY-MM-DD", "amount": 300, "category": "transport", "description": "такси"}}]}}
+{{"items": [{{"date": "YYYY-MM-DD", "amount": 300, "category": "transport", "description": "такси", "counterparty": null}}]}}
 
 Правила:
 - category — строго один из ключей:
@@ -38,7 +38,9 @@ def build_system_prompt(today: date) -> str:
 - Готовую еду и перекусы (самса, шаурма, мороженое, доширак, кофе) относи к "cafe",
   а продукты для готовки дома — к "products".
 - Деньги, которые пользователь получил (зарплата, перевод от родственника), — "income".
-- Деньги, которые пользователь дал кому-то в долг, — "lend"; имя человека оставь в description.
+- Деньги, которые пользователь дал кому-то в долг, — "lend"; деньги, которые ему вернули, — "repaid".
+  Для них в counterparty укажи имя человека в именительном падеже: «дал Султану» -> "Султан".
+  Для остальных категорий counterparty = null.
 - amount — положительное число без валюты. «10к» = 10000.
 - description — коротко, 1–5 слов, на языке пользователя.
 - Если дата не указана, используй сегодняшнюю.

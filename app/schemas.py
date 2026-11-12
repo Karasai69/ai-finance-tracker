@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.categories import kind_of, normalize_category
+from app.categories import PERSON_KINDS, kind_of, normalize_category
 
 
 class ParsedItem(BaseModel):
@@ -15,6 +15,7 @@ class ParsedItem(BaseModel):
     category: str = "other"
     kind: str = "expense"
     description: str = Field(default="", max_length=300)
+    counterparty: str | None = Field(default=None, max_length=100)
 
     @field_validator("category", mode="before")
     @classmethod
@@ -33,6 +34,8 @@ class ParsedItem(BaseModel):
         # Тип всегда следует из категории, чтобы данные не противоречили друг другу.
         self.kind = kind_of(self.category)
         self.amount = round(self.amount, 2)
+        name = (self.counterparty or "").strip()
+        self.counterparty = name or None if self.kind in PERSON_KINDS else None
         return self
 
 
@@ -67,6 +70,7 @@ class TransactionUpdate(BaseModel):
     amount: float | None = Field(default=None, gt=0)
     category: str | None = None
     description: str | None = Field(default=None, max_length=300)
+    counterparty: str | None = Field(default=None, max_length=100)
 
 
 class TransactionOut(ParsedItem):
@@ -81,6 +85,8 @@ class CategoryTotal(BaseModel):
     name: str
     kind: str
     total: float
+    limit: float | None = None
+    prev_total: float = 0  # за тот же период прошлого месяца
 
 
 class DayTotal(BaseModel):
@@ -94,9 +100,34 @@ class Summary(BaseModel):
     income: float
     expense: float
     lent: float
+    repaid: float
     balance: float
     by_category: list[CategoryTotal]
     by_day: list[DayTotal]
+    # Сравнение: расходы за те же дни прошлого месяца (для текущего месяца — с 1-го по сегодня)
+    prev_month: str
+    compare_days: int | None  # None — сравниваются месяцы целиком
+    expense_to_date: float
+    prev_expense: float
+
+
+class Debt(BaseModel):
+    person: str
+    lent: float
+    repaid: float
+    balance: float
+    since: date_type
+    last: date_type
+
+
+class BudgetIn(BaseModel):
+    limit: float | None = Field(default=None, ge=0)
+
+
+class BudgetOut(BaseModel):
+    category: str
+    name: str
+    limit: float
 
 
 # ---------- Вход в аккаунт ----------
