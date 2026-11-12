@@ -139,3 +139,9 @@ def test_login_is_rate_limited(make_client):
     assert "Retry-After" in blocked.headers
     # другой email с того же адреса не заблокирован
     assert c.post("/api/auth/login", json={"email": "x@b.kz", "password": "password123"}).status_code == 401
+
+
+def test_index_links_versioned_assets_and_is_not_cached(make_client):
+    r = make_client().get("/")
+    assert r.headers["cache-control"] == "no-cache"
+    assert "/static/app.js?v=" in r.text and "/static/style.css?v=" in r.text

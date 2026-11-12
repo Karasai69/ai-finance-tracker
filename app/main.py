@@ -1,10 +1,11 @@
 import csv
+import hashlib
 import io
 from datetime import date
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -61,9 +62,25 @@ def get_own_transaction(transaction_id: int, user: User, db: Session) -> Transac
     return row
 
 
+def _versioned_index() -> str:
+    """index.html со ссылками вида app.js?v=<хеш файла>.
+
+    Когда файл меняется, меняется и ссылка, поэтому браузер не берёт старую версию из кэша.
+    """
+    html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    for name in ("app.js", "style.css"):
+        digest = hashlib.sha256((STATIC_DIR / name).read_bytes()).hexdigest()[:10]
+        html = html.replace(f"/static/{name}", f"/static/{name}?v={digest}")
+    return html
+
+
+INDEX_HTML = _versioned_index()
+
+
 @app.get("/", include_in_schema=False)
 def index():
-    return FileResponse(STATIC_DIR / "index.html")
+    # Саму страницу браузер должен проверять каждый раз, чтобы сразу видеть новые версии файлов
+    return HTMLResponse(INDEX_HTML, headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/api/health")
