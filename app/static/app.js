@@ -12,7 +12,13 @@ const state = {
   view: "table",
   user: null,
   authMode: "login",
+  kinds: {},      // категория -> тип (expense, income, lend, repaid)
+  summary: null,
+  debts: [],
 };
+
+const PERSON_KINDS = ["lend", "repaid"];
+const isPersonKind = (category) => PERSON_KINDS.includes(state.kinds[category]);
 
 const fmt = (value) => Number(value).toLocaleString("ru-RU", { maximumFractionDigits: 2 });
 const money = (value) => fmt(value).replace("-", "−") + " ₸";
@@ -108,11 +114,21 @@ function renderPreview() {
       el("div", { class: "preview-item" },
         el("input", { type: "date", value: item.date, "aria-label": "Дата",
           onchange: (e) => (item.date = e.target.value) }),
-        categorySelect(item.category, (value) => (item.category = value)),
+        categorySelect(item.category, (value) => {
+          const hadPerson = isPersonKind(item.category);
+          item.category = value;
+          if (hadPerson !== isPersonKind(value)) renderPreview(); // показать или убрать поле «Кто»
+        }),
         el("input", { type: "number", min: "0", step: "any", value: item.amount, "aria-label": "Сумма",
           onchange: (e) => (item.amount = Number(e.target.value)) }),
-        el("input", { class: "desc", type: "text", value: item.description, "aria-label": "Описание",
-          onchange: (e) => (item.description = e.target.value) }),
+        el("div", { class: "desc" },
+          el("input", { type: "text", value: item.description, "aria-label": "Описание", placeholder: "Описание",
+            onchange: (e) => (item.description = e.target.value) }),
+          isPersonKind(item.category)
+            ? el("input", { type: "text", class: "person", value: item.counterparty || "", "aria-label": "Кто",
+                placeholder: "Кто", maxlength: "100", onchange: (e) => (item.counterparty = e.target.value) })
+            : null,
+        ),
         el("button", { type: "button", class: "icon-btn", title: "Убрать из списка", "aria-label": "Убрать из списка",
           onclick: () => { state.preview.splice(index, 1); renderPreview(); } }, "×"),
       ),
@@ -156,10 +172,14 @@ async function savePreview() {
     state.preview = [];
     renderPreview();
     $("text").value = "";
-    setStatus(`Сохранено записей: ${items.length}`);
     const savedMonth = items[0].date.slice(0, 7);
-    if (savedMonth !== state.month) setMonth(savedMonth);
-    else await refresh();
+    if (savedMonth !== state.month) {
+      state.month = savedMonth;
+      $("month-label").textContent = monthLabel(savedMonth);
+    }
+    await refresh();
+    const warnings = limitWarnings(new Set(items.map((i) => i.category)));
+    setStatus([`Сохранено записей: ${items.length}`, ...warnings].join(". "), warnings.some((w) => w.includes("превышен")));
   } catch (error) {
     setStatus(error.message, true);
   } finally {
@@ -169,15 +189,62 @@ async function savePreview() {
 
 // ---------- Итоги ----------
 
+const MONTHS_GEN = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа",
+  "сентября", "октября", "ноября", "декабря"];
+const MONTHS_PREP = ["январе", "феврале", "марте", "апреле", "мае", "июне", "июле", "августе",
+  "сентябре", "октябре", "ноябре", "декабре"];
+
+function periodLabel(month, days) {
+  const m = Number(month.slice(5, 7)) - 1;
+  return days ? `за ${days === 1 ? "1" : `1–${days}`} ${MONTHS_GEN[m]}` : `в ${MONTHS_PREP[m]}`;
+}
+
+function renderComparison(summary) {
+  const box = $("compare");
+  const days = summary.compare_days;
+  if (!summary.expense_to_date && !summary.prev_expense) return (box.textContent = "");
+  const now = periodLabel(summary.month, days);
+  const before = periodLabel(summary.prev_month, days);
+  if (!summary.prev_expense) {
+    box.textContent = `Расходы ${now}: ${money(summary.expense_to_date)}. ${before[0].toUpperCase()}${before.slice(1)} записей нет — сравнивать не с чем.`;
+    return;
+  }
+  const diff = summary.expense_to_date - summary.prev_expense;
+  const pct = Math.round(Math.abs(diff) / summary.prev_expense * 100);
+  const verdict = pct === 0 ? "столько же, сколько" : `на ${pct}% ${diff > 0 ? "больше" : "меньше"}, чем`;
+  box.replaceChildren(
+    `Расходы ${now}: `, el("b", {}, money(summary.expense_to_date)),
+    ` — ${verdict} ${before} (${money(summary.prev_expense)}).`,
+  );
+}
+
+function limitWarnings(categories) {
+  if (!state.summary) return [];
+  const out = [];
+  for (const cat of state.summary.by_category) {
+    if (!cat.limit || (categories && !categories.has(cat.category))) continue;
+    if (cat.total > cat.limit) out.push(`Лимит «${cat.name}» превышен: ${money(cat.total)} из ${money(cat.limit)}`);
+    else if (cat.total >= cat.limit * 0.9) out.push(`Лимит «${cat.name}» почти исчерпан: осталось ${money(cat.limit - cat.total)}`);
+  }
+  return out;
+}
+
 function renderSummary(summary) {
+  state.summary = summary;
   $("sum-income").textContent = money(summary.income);
   $("sum-expense").textContent = money(summary.expense);
   $("sum-lent").textContent = money(summary.lent);
+  $("sum-repaid").textContent = money(summary.repaid);
+  $("repaid-box").hidden = !summary.repaid;
   $("sum-balance").textContent = money(summary.balance);
   $("sum-balance").classList.toggle("negative", summary.balance < 0);
+  renderComparison(summary);
+  renderDailyChart(summary);
 
   const expenses = summary.by_category.filter((c) => c.kind === "expense");
-  const max = Math.max(...expenses.map((c) => c.total), 1);
+  const scale = Math.max(...expenses.map((c) => Math.max(c.total, c.limit || 0)), 1);
+  const showDelta = summary.prev_expense > 0;
+  const prevName = MONTHS_PREP[Number(summary.prev_month.slice(5, 7)) - 1];
   const box = $("categories");
   box.replaceChildren();
   if (!expenses.length) {
@@ -187,13 +254,194 @@ function renderSummary(summary) {
   for (const cat of expenses) {
     const pct = summary.expense ? (cat.total / summary.expense) * 100 : 0;
     const share = pct > 0 && pct < 1 ? "<1" : Math.round(pct);
-    const fill = el("div", { class: "bar-fill" });
-    fill.style.width = `${(cat.total / max) * 100}%`;
+    const over = cat.limit && cat.total > cat.limit;
+    const near = cat.limit && !over && cat.total >= cat.limit * 0.9;
+    const fill = el("div", { class: `bar-fill${over ? " over" : near ? " near" : ""}` });
+    fill.style.width = `${(cat.total / scale) * 100}%`;
+    const track = el("div", { class: "bar-track" }, fill);
+    if (cat.limit) {
+      const mark = el("span", { class: "bar-limit", title: `Лимит ${money(cat.limit)}` });
+      mark.style.left = `${(cat.limit / scale) * 100}%`;
+      track.append(mark);
+    }
+    let note = null;
+    if (cat.limit) {
+      note = over
+        ? el("span", { class: "bar-note over" }, `⚠ превышен на ${money(cat.total - cat.limit)} (лимит ${money(cat.limit)})`)
+        : el("span", { class: `bar-note${near ? " near" : ""}` }, `${near ? "⚠ " : ""}осталось ${money(cat.limit - cat.total)} из ${money(cat.limit)}`);
+    }
+    let delta = null;
+    if (showDelta && cat.total && cat.prev_total) {
+      const d = Math.round(((cat.total - cat.prev_total) / cat.prev_total) * 100);
+      delta = el("span", { class: "bar-delta" }, d === 0 ? `как в ${prevName}` : `${d > 0 ? "▲" : "▼"} ${Math.abs(d)}% к ${prevName.replace(/е$/, "ю")}`);
+    }
     box.append(el("div", { class: "bar" },
-      el("span", {}, cat.name),
-      el("div", { class: "bar-track" }, fill),
+      el("span", { class: "bar-name" }, cat.name),
+      track,
       el("b", {}, money(cat.total), el("small", {}, `${share}%`)),
+      note || delta ? el("div", { class: "bar-meta" }, note, delta) : null,
     ));
+  }
+}
+
+// ---------- График расходов по дням ----------
+
+function renderDailyChart(summary) {
+  const box = $("daily-chart");
+  box.replaceChildren();
+  const [y, m] = summary.month.split("-").map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const today = todayISO();
+  const isCurrent = today.slice(0, 7) === summary.month;
+  const lastDay = isCurrent ? Number(today.slice(8, 10)) : today.slice(0, 7) > summary.month ? daysInMonth : 0;
+  const byDay = Object.fromEntries(summary.by_day.map((d) => [Number(d.date.slice(8, 10)), d.expense]));
+  const values = Array.from({ length: lastDay }, (_, i) => byDay[i + 1] || 0);
+  if (!values.some((v) => v > 0)) {
+    box.append(el("p", { class: "empty" }, "Расходов в этом месяце пока нет."));
+    return;
+  }
+
+  // Ширина рисунка = ширина блока, чтобы на телефоне график не сжимался в полоску
+  const W = Math.max(300, Math.round(box.clientWidth || 640)), H = 200, padL = 44, padR = 8, padT = 12, padB = 24;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const max = Math.max(...values);
+  const step = 10 ** Math.floor(Math.log10(max));
+  const top = Math.ceil(max / step) * step;
+  const yOf = (v) => padT + innerH - (v / top) * innerH;
+  const slot = innerW / daysInMonth;
+  const barW = Math.max(2, slot - 2); // 2px зазор между столбиками
+  const avg = Math.round(summary.expense_to_date / values.length);
+
+  const ns = "http://www.w3.org/2000/svg";
+  const svgEl = (tag, attrs, text) => {
+    const n = document.createElementNS(ns, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    if (text !== undefined) n.textContent = text;
+    return n;
+  };
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, class: "daily-svg", role: "img",
+    "aria-label": `Расходы по дням, в среднем ${money(avg)} в день` });
+
+  for (const v of [0, top / 2, top]) {
+    svg.append(svgEl("line", { x1: padL, x2: W - padR, y1: yOf(v), y2: yOf(v), class: "grid" }));
+    svg.append(svgEl("text", { x: padL - 6, y: yOf(v) + 4, class: "axis", "text-anchor": "end" }, fmt(v)));
+  }
+  const tip = el("div", { class: "chart-tip", hidden: "" });
+  values.forEach((v, i) => {
+    const day = i + 1;
+    const x = padL + i * slot + (slot - barW) / 2;
+    if (v > 0) {
+      const h = Math.max(2, innerH - (yOf(v) - padT));
+      const r = Math.min(4, barW / 2, h / 2);
+      // скруглён только верх столбика, низ стоит на оси
+      const yTop = padT + innerH - h, base = padT + innerH;
+      svg.append(svgEl("path", {
+        class: `bar${isCurrent && day === lastDay ? " today" : ""}`,
+        d: `M${x},${base} V${yTop + r} Q${x},${yTop} ${x + r},${yTop} H${x + barW - r} Q${x + barW},${yTop} ${x + barW},${yTop + r} V${base} Z`,
+      }));
+    }
+    if (day === 1 || day % 5 === 0 || day === lastDay) {
+      svg.append(svgEl("text", { x: padL + i * slot + slot / 2, y: H - 6, class: "axis", "text-anchor": "middle" }, day));
+    }
+    const hit = svgEl("rect", { x: padL + i * slot, y: padT, width: slot, height: innerH, class: "hit" });
+    hit.addEventListener("mouseenter", () => {
+      tip.hidden = false;
+      tip.textContent = `${day} ${MONTHS_GEN[m - 1]}: ${v ? money(v) : "расходов нет"}`;
+      tip.style.left = `${((padL + i * slot + slot / 2) / W) * 100}%`;
+    });
+    hit.addEventListener("mouseleave", () => (tip.hidden = true));
+    svg.append(hit);
+  });
+  svg.append(svgEl("line", { x1: padL, x2: W - padR, y1: yOf(avg), y2: yOf(avg), class: "avg" }));
+
+  box.append(
+    el("p", { class: "chart-caption" }, `В среднем ${money(avg)} в день`,
+      el("span", { class: "legend-avg" }, "пунктир — среднее")),
+    el("div", { class: "chart-wrap" }, svg, tip),
+  );
+}
+
+// ---------- Долги ----------
+
+function renderDebts() {
+  const open = state.debts.filter((d) => d.balance > 0);
+  $("debts").hidden = open.length === 0;
+  $("debts-total").textContent = money(open.reduce((s, d) => s + d.balance, 0));
+  const box = $("debts-list");
+  box.replaceChildren();
+  for (const debt of open) {
+    const since = new Date(debt.since + "T00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+    const form = el("div", { class: "repay", hidden: "" });
+    const amount = el("input", { type: "number", min: "0", step: "any", value: debt.balance, "aria-label": "Сколько вернули" });
+    const note = el("span", { class: "editor-note", role: "status" });
+    const confirm = el("button", { type: "button", class: "btn primary" }, "Записать возврат");
+    confirm.addEventListener("click", async () => {
+      const value = Number(amount.value);
+      if (!(value > 0)) return (note.textContent = "Укажите сумму больше нуля");
+      confirm.disabled = true;
+      try {
+        await api("/api/transactions", { method: "POST", body: JSON.stringify({
+          items: [{ date: todayISO(), amount: value, category: "repaid", counterparty: debt.person, description: "вернул долг" }],
+        }) });
+        setStatus(value >= debt.balance ? `${debt.person} вернул долг полностью` : `${debt.person} вернул ${money(value)}`);
+        await refresh();
+      } catch (error) {
+        note.textContent = error.message;
+        confirm.disabled = false;
+      }
+    });
+    form.append(el("label", {}, "Сколько вернули, ₸", amount), confirm, note);
+    const toggle = el("button", { type: "button", class: "btn ghost" }, "Вернул");
+    toggle.addEventListener("click", () => {
+      form.hidden = !form.hidden;
+      toggle.textContent = form.hidden ? "Вернул" : "Отмена";
+      if (!form.hidden) amount.focus();
+    });
+    box.append(el("div", { class: "debt" },
+      el("div", { class: "debt-main" },
+        el("div", {}, el("b", {}, debt.person), el("div", { class: "debt-since" },
+          `с ${since}`, debt.repaid ? `, уже вернул ${money(debt.repaid)}` : "")),
+        el("strong", { class: "lend" }, money(debt.balance)),
+        toggle,
+      ),
+      form,
+    ));
+  }
+}
+
+// ---------- Лимиты ----------
+
+async function openLimits() {
+  const current = Object.fromEntries((await api("/api/budgets")).map((b) => [b.category, b.limit]));
+  const box = $("limits-items");
+  box.replaceChildren();
+  for (const cat of state.categories.filter((c) => c.kind === "expense")) {
+    box.append(el("label", { class: "limit-row" },
+      el("span", {}, cat.name),
+      el("input", { type: "number", min: "0", step: "100", placeholder: "без лимита", "data-category": cat.key,
+        "data-initial": current[cat.key] ?? "", value: current[cat.key] ?? "" }),
+    ));
+  }
+  $("limits-note").textContent = "";
+  $("limits").showModal();
+}
+
+async function saveLimits() {
+  const inputs = [...$("limits-items").querySelectorAll("input")].filter((i) => i.value !== i.dataset.initial);
+  $("limits-save").disabled = true;
+  try {
+    for (const input of inputs) {
+      const limit = input.value === "" ? null : Number(input.value);
+      await api(`/api/budgets/${input.dataset.category}`, { method: "PUT", body: JSON.stringify({ limit }) });
+    }
+    $("limits").close();
+    await refresh();
+    const warnings = limitWarnings();
+    setStatus(inputs.length ? ["Лимиты сохранены", ...warnings].join(". ") : "");
+  } catch (error) {
+    $("limits-note").textContent = error.message;
+  } finally {
+    $("limits-save").disabled = false;
   }
 }
 
@@ -212,13 +460,14 @@ function renderTable(rows) {
     .sort((a, b) => (state.order[a] ?? 99) - (state.order[b] ?? 99));
   const hasIncome = rows.some((r) => r.kind === "income");
   const hasLend = rows.some((r) => r.kind === "lend");
+  const hasRepaid = rows.some((r) => r.kind === "repaid");
 
   // Суммы по дням
   const cells = new Map(); // "2026-11-04|transport" -> { total, notes[], rows[] }
   const add = (key, row) => {
     const cell = cells.get(key) || { total: 0, notes: [], rows: [] };
     cell.total += row.amount;
-    cell.notes.push(`${row.description || state.names[row.category]}: ${fmt(row.amount)}`);
+    cell.notes.push(`${row.counterparty || row.description || state.names[row.category]}: ${fmt(row.amount)}`);
     cell.rows.push(row);
     cells.set(key, cell);
   };
@@ -242,6 +491,7 @@ function renderTable(rows) {
     { key: "_total", title: "Расходы за день", cls: "col-total" },
     hasIncome && { key: "income", title: "Доход", cls: "col-income" },
     hasLend && { key: "lend", title: "В долг", cls: "col-lend" },
+    hasRepaid && { key: "repaid", title: "Вернули", cls: "col-income" },
     ...expenseCats.map((key, i) => ({ key, title: state.names[key] || key, heat: true, cls: i === 0 ? "col-first-cat" : null })),
   ].filter(Boolean);
 
@@ -323,11 +573,12 @@ function renderList(rows) {
       el("div", { class: "day-head" }, el("span", {}, label), el("span", {}, spent ? "расходы " + money(spent) : "")),
     );
     for (const row of items) {
-      const sign = row.kind === "income" ? "+" : "−";
+      const sign = row.kind === "income" || row.kind === "repaid" ? "+" : "−";
       group.append(el("div", { class: "tx" },
         el("div", {},
           el("div", {}, row.description || state.names[row.category]),
-          el("div", { class: "tx-cat" }, state.names[row.category] || row.category),
+          el("div", { class: "tx-cat" }, state.names[row.category] || row.category,
+            row.counterparty ? ` · ${row.counterparty}` : ""),
         ),
         el("span", { class: `tx-amount ${row.kind}` }, sign + money(row.amount)),
         el("button", { type: "button", class: "icon-btn edit", title: "Изменить запись", "aria-label": "Изменить запись",
@@ -360,7 +611,12 @@ function renderEditor() {
   const box = $("editor-items");
   box.replaceChildren();
   for (const row of rows) {
-    const draft = { date: row.date, category: row.category, amount: row.amount, description: row.description };
+    const draft = { date: row.date, category: row.category, amount: row.amount, description: row.description,
+      counterparty: row.counterparty || "" };
+    const personField = el("label", { class: "wide" }, "Кто (кому дал или кто вернул)",
+      el("input", { type: "text", value: draft.counterparty, maxlength: "100",
+        onchange: (e) => (draft.counterparty = e.target.value) }));
+    personField.hidden = !isPersonKind(row.category);
     const note = el("span", { class: "editor-note", role: "status" });
     const remove = el("button", { type: "button", class: "btn ghost danger" }, "Удалить");
     remove.addEventListener("click", async () => {
@@ -383,7 +639,8 @@ function renderEditor() {
       if (!(draft.amount > 0)) return (note.textContent = "Сумма должна быть больше нуля");
       save.disabled = true;
       try {
-        await api(`/api/transactions/${row.id}`, { method: "PATCH", body: JSON.stringify(draft) });
+        const body = { ...draft, counterparty: isPersonKind(draft.category) ? draft.counterparty : null };
+        await api(`/api/transactions/${row.id}`, { method: "PATCH", body: JSON.stringify(body) });
         await refresh();
         renderEditor();
         setStatus("Изменения сохранены");
@@ -395,11 +652,15 @@ function renderEditor() {
     box.append(el("div", { class: "editor-item" },
       el("div", { class: "editor-fields" },
         el("label", {}, "Дата", el("input", { type: "date", value: row.date, onchange: (e) => (draft.date = e.target.value) })),
-        el("label", {}, "Категория", categorySelect(row.category, (v) => (draft.category = v))),
+        el("label", {}, "Категория", categorySelect(row.category, (v) => {
+          draft.category = v;
+          personField.hidden = !isPersonKind(v);
+        })),
         el("label", {}, "Сумма, ₸", el("input", { type: "number", min: "0", step: "any", value: row.amount,
           onchange: (e) => (draft.amount = Number(e.target.value)) })),
         el("label", { class: "wide" }, "Описание", el("input", { type: "text", value: row.description, maxlength: "300",
           onchange: (e) => (draft.description = e.target.value) })),
+        personField,
       ),
       el("div", { class: "editor-actions" }, note, remove, save),
     ));
@@ -418,10 +679,13 @@ function setView(view) {
 async function refresh() {
   const month = state.month;
   try {
-    const [summary, rows] = await Promise.all([
+    const [summary, rows, debts] = await Promise.all([
       api(`/api/summary?month=${month}`),
       api(`/api/transactions?month=${month}`),
+      api("/api/debts"),
     ]);
+    state.debts = debts;
+    renderDebts();
     if (month !== state.month) return; // пока грузили, переключили месяц
     state.rows = rows;
     renderSummary(summary);
@@ -570,6 +834,11 @@ async function init() {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) parseText();
   });
   setupVoice();
+  let resizeTimer;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => state.summary && renderDailyChart(state.summary), 150);
+  });
   setView(storage.get("view") === "list" ? "list" : "table");
 
   $("auth-form").addEventListener("submit", submitAuth);
@@ -577,6 +846,9 @@ async function init() {
   $("logout").addEventListener("click", logout);
   $("import").addEventListener("click", () => $("import-file").click());
   $("editor-close").addEventListener("click", () => $("editor").close());
+  $("open-limits").addEventListener("click", () => openLimits().catch((e) => setStatus(e.message, true)));
+  $("limits-close").addEventListener("click", () => $("limits").close());
+  $("limits-save").addEventListener("click", saveLimits);
   $("editor").addEventListener("click", (e) => { if (e.target === $("editor")) $("editor").close(); });
   $("import-file").addEventListener("change", importFile);
   state.month = todayISO().slice(0, 7);
@@ -585,6 +857,7 @@ async function init() {
   state.categories = data.categories;
   state.names = Object.fromEntries(data.categories.map((c) => [c.key, c.name]));
   state.order = Object.fromEntries(data.categories.map((c, i) => [c.key, i]));
+  state.kinds = Object.fromEntries(data.categories.map((c) => [c.key, c.kind]));
   $("ai-note").textContent = health.ai_enabled
     ? "Текст разбирает ИИ: можно писать как угодно, например «вчера на такси ушло 300»."
     : "ИИ не подключён: работает простой разбор. Пишите «категория сумма» через запятую.";

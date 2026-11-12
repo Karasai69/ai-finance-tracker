@@ -54,7 +54,9 @@
         <div><dt>Доходы</dt><dd id="sum-income" class="income">0 ₸</dd></div>
         <div><dt>Расходы</dt><dd id="sum-expense" class="expense">0 ₸</dd></div>
         <div><dt>Дал в долг</dt><dd id="sum-lent" class="lend">0 ₸</dd></div>
+        <div id="repaid-box" hidden><dt>Вернули долг</dt><dd id="sum-repaid" class="income">0 ₸</dd></div>
       </dl>
+      <p id="compare" class="compare"></p>
     </section>
 
     <section class="entry" aria-label="Новая запись">
@@ -95,8 +97,26 @@
       <div id="view-list" class="list" hidden></div>
     </section>
 
-    <section class="categories" aria-label="Расходы по категориям">
-      <h2>Куда ушли деньги</h2>
+    <div class="insights">
+      <section class="chart-panel" aria-labelledby="daily-title">
+        <h2 id="daily-title">Расходы по дням</h2>
+        <div id="daily-chart" class="daily-chart"></div>
+      </section>
+
+      <section id="debts" class="debts" aria-labelledby="debts-title" hidden>
+        <div class="section-head">
+          <h2 id="debts-title">Мне должны</h2>
+          <strong id="debts-total" class="lend"></strong>
+        </div>
+        <div id="debts-list"></div>
+      </section>
+    </div>
+
+    <section class="categories" aria-labelledby="cat-title">
+      <div class="section-head">
+        <h2 id="cat-title">Куда ушли деньги</h2>
+        <button type="button" id="open-limits" class="link-btn">Настроить лимиты</button>
+      </div>
       <div id="categories" class="bars"></div>
     </section>
   </main>
@@ -107,6 +127,19 @@
       <button type="button" id="editor-close" class="icon-btn" aria-label="Закрыть">×</button>
     </div>
     <div id="editor-items"></div>
+  </dialog>
+
+  <dialog id="limits" class="editor" aria-labelledby="limits-title">
+    <div class="editor-head">
+      <h2 id="limits-title">Лимиты на месяц</h2>
+      <button type="button" id="limits-close" class="icon-btn" aria-label="Закрыть">×</button>
+    </div>
+    <p class="limits-lead">Сколько вы готовы тратить в месяц на каждую категорию. Пустое поле — без лимита.</p>
+    <div id="limits-items" class="limits-items"></div>
+    <div class="editor-actions limits-actions">
+      <span id="limits-note" class="editor-note" role="status"></span>
+      <button type="button" id="limits-save" class="btn primary">Сохранить лимиты</button>
+    </div>
   </dialog>
 
   <script src="/static/app.js"></script>
