@@ -359,7 +359,7 @@ def insights(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """3–4 вывода о месяце. Числа считает приложение, ИИ только формулирует."""
+    """Выводы о месяце. Числа считает приложение, ИИ только формулирует."""
     month = month or current_month()
     start, end = month_range(month)
     counts = dict(db.execute(
@@ -367,7 +367,16 @@ def insights(
         .where(Transaction.user_id == user.id, Transaction.date >= start, Transaction.date < end)
         .group_by(Transaction.category)
     ).all())
-    facts = build_facts(summary(month=month, user=user, db=db), debts(user=user, db=db), counts)
+    expense_cats = [k for k, (_, kind) in CATEGORIES.items() if kind == "expense"]
+    top = db.execute(
+        select(Transaction.description, Transaction.category, Transaction.amount, Transaction.date)
+        .where(Transaction.user_id == user.id, Transaction.date >= start, Transaction.date < end,
+               Transaction.category.in_(expense_cats))
+        .order_by(Transaction.amount.desc()).limit(3)
+    ).all()
+    big = [{"описание": d or "", "категория": CATEGORIES[c][0], "сумма": float(a), "дата": dt.strftime("%d.%m")}
+           for d, c, a, dt in top]
+    facts = build_facts(summary(month=month, user=user, db=db), debts(user=user, db=db), counts, big)
     if not facts["категории"] or not settings.ai_enabled:
         return Insights(source="rules", points=rule_insights(facts))
 

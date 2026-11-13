@@ -32,8 +32,9 @@ def test_rule_insights():
     assert "«Спорт»" in text and "52%" in text
     assert "превышен на 1 000 ₸" in text
     assert "на 24% больше" in text
-    assert "Алижан" not in text or len(points) <= 4
-    assert len(points) <= 4
+    assert "В среднем вы тратили 3 500 ₸ в день" in text  # 42 000 за 12 дней
+    assert "Из доходов осталось 73%" in text
+    assert len(points) <= 7
 
 
 def test_empty_month():
@@ -59,3 +60,16 @@ def test_ai_payload_without_limits():
     for c in summary.by_category:
         c.limit = None
     assert "лимиты" not in ai_payload(build_facts(summary, []))
+
+
+def test_big_purchases_in_facts_and_payload():
+    from app.insights import ai_payload
+
+    big = [{"описание": "кроссовки", "категория": "Одежда", "сумма": 30000.4, "дата": "05.11"}]
+    facts = build_facts(make_summary(), DEBTS, big=big)
+    assert facts["крупные_покупки"][0]["сумма"] == 30000
+    assert "«кроссовки», 30 000 ₸ (05.11)" in " ".join(rule_insights(facts))
+    payload = ai_payload(facts)
+    assert payload["крупные_покупки"][0]["сумма"] == "30 000 ₸"
+    assert payload["остаток_от_доходов"]["процент_от_доходов"] == "73%"
+    assert payload["сильнее_всего_изменились"][0]["название"] == "Спорт"
