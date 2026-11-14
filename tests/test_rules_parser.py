@@ -80,3 +80,8 @@ def test_lend_and_repaid_get_person():
 def test_savings_keywords():
     items, _ = parse("отложил 20 000, из копилки 5000")
     assert items == [("savings", 20000, "save"), ("savings_out", 5000, "unsave")]
+
+
+def test_ten_percent_is_savings():
+    items, _ = parse("процент с зарплаты 17 250")
+    assert items == [("savings", 17250, "save")]

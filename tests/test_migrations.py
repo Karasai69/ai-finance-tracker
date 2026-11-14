@@ -47,3 +47,29 @@ def test_database_created_before_migrations_keeps_data(tmp_path):
         assert connection.execute(text("SELECT count(*) FROM users")).scalar() == 1
         # имя должника перенесено из описания в новую колонку
         assert connection.execute(text("SELECT counterparty FROM transactions")).scalar() == "Алижан"
+
+
+def test_ten_percent_becomes_savings(tmp_path):
+    """Старые записи «10 процентов» после миграции считаются отложенными деньгами."""
+    from alembic import command
+
+    from app.migrate import alembic_config
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'ten.db'}")
+    with engine.begin() as connection:
+        command.upgrade(alembic_config(connection), "0003")
+        connection.execute(text("INSERT INTO users (id, email, password_hash) VALUES (1, 'a@b.kz', 'x')"))
+        connection.execute(text(
+            "INSERT INTO transactions (user_id, date, amount, category, kind, description) VALUES "
+            "(1, '2026-11-01', 17250, 'ten_percent', 'expense', '10%'), "
+            "(1, '2026-11-02', 900, 'cafe', 'expense', 'кофе')"
+        ))
+        connection.execute(text("INSERT INTO budgets (user_id, category, monthly_limit) VALUES (1, 'ten_percent', 20000)"))
+
+    with engine.begin() as connection:
+        run_migrations(connection)
+
+    with engine.connect() as connection:
+        rows = connection.execute(text("SELECT category, kind FROM transactions ORDER BY id")).all()
+        assert [tuple(r) for r in rows] == [("savings", "save"), ("cafe", "expense")]
+        assert connection.execute(text("SELECT count(*) FROM budgets")).scalar() == 0

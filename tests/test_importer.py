@@ -93,3 +93,9 @@ def test_excel_errors_and_broken_file():
     assert errors == ["строка 3: неизвестная категория «Космос»"]
 
     assert parse_xlsx(b"not an excel file") == ([], ["не получилось открыть файл: нужен Excel .xlsx"])
+
+
+def test_old_ten_percent_rows_become_savings():
+    items, errors = parse_csv("01.11.2026;;10 процентов;17 250;\n02.11.2026;;ten_percent;5000;")
+    assert errors == []
+    assert [(i.category, i.kind) for i in items] == [("savings", "save"), ("savings", "save")]

@@ -17,7 +17,7 @@ def money(value: float) -> str:
 
 
 # Категории, по которым ИИ не даёт советов экономить
-NO_ADVICE = {"charity", "gift", "ten_percent", "sport", "books"}
+NO_ADVICE = {"charity", "gift", "sport", "books"}
 
 
 def build_facts(summary: Summary, debts: list[Debt], counts: dict[str, int] | None = None,

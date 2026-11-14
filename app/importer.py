@@ -14,11 +14,12 @@ from typing import Any, Iterable
 
 from pydantic import ValidationError
 
-from app.categories import CATEGORIES
+from app.categories import ALIASES, CATEGORIES
 from app.schemas import ParsedItem
 
 MAX_ROWS = 5000
 _NAME_TO_KEY = {name.lower(): key for key, (name, _) in CATEGORIES.items()}
+_NAME_TO_KEY["10 процентов"] = "savings"  # старая категория из прежних выгрузок
 
 
 def _parse_date(value: Any) -> date:
@@ -39,6 +40,8 @@ def _parse_category(value: Any) -> str:
     value = str(value or "").strip()
     if value in CATEGORIES:
         return value
+    if value in ALIASES:
+        return ALIASES[value]
     key = _NAME_TO_KEY.get(value.lower())
     if key is None:
         raise ValueError(f"неизвестная категория «{value}»")

@@ -695,7 +695,7 @@ function renderTable(rows) {
 const CAL_GROUPS = [
   { name: "Еда", color: "#7a1f33", cats: ["products", "vegetables", "convenience", "cafe", "nuts"] },
   { name: "Дорога", color: "#a8822e", cats: ["transport"] },
-  { name: "Отдаю", color: "#c0563f", cats: ["charity", "gift", "ten_percent"] },
+  { name: "Отдаю", color: "#c0563f", cats: ["charity", "gift"] },
   { name: "Быт и одежда", color: "#8a7a6a", cats: ["household", "laundry", "housing", "clothes"] },
   { name: "Развитие", color: "#2f5d7a", cats: ["books", "sport"] },
   { name: "Другое", color: "#9aa8a3", cats: ["other"] },
