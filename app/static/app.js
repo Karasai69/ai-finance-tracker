@@ -262,7 +262,7 @@ function renderSummary(summary) {
   $("sum-repaid").textContent = money(summary.repaid);
   $("repaid-box").hidden = !summary.repaid;
   $("sum-saved").textContent = money(summary.saved || 0);
-  $("saved-box").hidden = !summary.saved;
+  $("sum-saved-total").textContent = summary.savings_total ? `всего ${money(summary.savings_total)}` : "";
   $("savings-total").textContent = money(summary.savings_total || 0);
   $("savings-month").textContent = (summary.saved > 0 ? "+" : "") + money(summary.saved || 0);
   $("savings-month-label").textContent = `В ${MONTHS_PREP[Number(summary.month.slice(5, 7)) - 1]}`;
