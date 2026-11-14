@@ -724,7 +724,8 @@ function showCalTip(cell, label, items) {
     ...shown.map(([cat, sum]) => el("div", { class: "cal-tip-row" },
       el("i", { style: `background:${CAL_COLOR[cat] || "#c9d3cc"}` }),
       el("span", {}, state.names[cat] || cat),
-      el("span", { class: "cal-tip-bar" }, el("span", { style: `width:${Math.max(4, (sum / spent) * 100).toFixed(0)}%` })),
+      el("span", { class: "cal-tip-bar" }, el("span", {
+        style: `width:${Math.max(4, (sum / spent) * 100).toFixed(0)}%;background:${CAL_COLOR[cat] || "#9aa8a3"}` })),
       el("b", {}, money(sum)))),
     rest ? el("div", { class: "cal-tip-row" }, el("i"), el("span", {}, `ещё ${lines.length - 6}`), el("span"), el("b", {}, money(rest))) : null,
     ...other.map((r) => el("div", { class: "cal-tip-row extra" },
@@ -738,9 +739,10 @@ function showCalTip(cell, label, items) {
   const w = tip.offsetWidth, h = tip.offsetHeight;
   let left = box.left + box.width / 2 - w / 2;
   left = Math.min(Math.max(8, left), window.innerWidth - w - 8);
-  let top = box.top - h - 8;
+  let top = box.top - h - 10;
   tip.classList.toggle("below", top < 8);
-  if (top < 8) top = box.bottom + 8;
+  if (top < 8) top = box.bottom + 10;
+  tip.style.setProperty("--arrow", `${Math.min(w - 16, Math.max(16, box.left + box.width / 2 - left))}px`);
   tip.style.left = `${left + window.scrollX}px`;
   tip.style.top = `${top + window.scrollY}px`;
 }
