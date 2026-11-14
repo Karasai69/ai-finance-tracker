@@ -623,9 +623,15 @@ function renderCalendar(rows) {
   const avg = totals.length ? totals.reduce((a, b) => a + b, 0) / totals.length : 0;
 
   // Выбранный день: тот, что выбрали раньше в этом месяце, иначе сегодня, иначе последний день с записями
-  if (!state.calDay || !state.calDay.startsWith(state.month)) {
-    state.calDay = today.startsWith(state.month) ? today : ([...byDay.keys()].sort().pop() || iso(1));
-  }
+  // Выбор под календарём: null — весь месяц, иначе день или неделя этого месяца
+  if (state.calSel && !state.calSel.from.startsWith(state.month)) state.calSel = null;
+  const sel = state.calSel;
+  const select = (next) => {
+    hideCalTip();
+    const same = sel && next && sel.from === next.from && sel.to === next.to;
+    state.calSel = same ? null : next; // повторное нажатие — обратно ко всему месяцу
+    renderCalendar(state.rows);
+  };
 
   const grid = el("div", { class: "cal", role: "grid", "aria-label": "Календарь расходов" });
   ["пн", "вт", "ср", "чт", "пт", "сб", "вс"].forEach((w, i) => grid.append(el("div", { class: `cal-wh${i >= 5 ? " we" : ""}` }, w)));
@@ -640,14 +646,15 @@ function renderCalendar(rows) {
     const future = day > today;
     const groups = CAL_GROUPS.filter((g) => items.some((r) => r.kind === "expense" && g.cats.includes(r.category)));
     const extra = items.filter((r) => r.kind !== "expense");
-    const cls = ["cal-d", weekday >= 5 && "we", future && "future", day === today && "today", day === state.calDay && "sel"];
+    const cls = ["cal-d", weekday >= 5 && "we", future && "future", day === today && "today", sel?.kind === "day" && day === sel.from && "sel",
+      sel?.kind === "week" && day >= sel.from && day <= sel.to && "in-week"];
     const label = new Date(day + "T00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long", weekday: "long" });
     const cell = el("button", {
       type: "button", class: cls.filter(Boolean).join(" "),
       "aria-label": `${label}: ${spent ? money(spent) : "нет расходов"}`,
-      "aria-pressed": day === state.calDay ? "true" : "false",
+      "aria-pressed": sel?.kind === "day" && day === sel.from ? "true" : "false",
       style: spent ? `--h:${(0.04 + (spent / max) * 0.2).toFixed(3)}` : null,
-      onclick: () => { hideCalTip(); state.calDay = day; renderCalendar(state.rows); },
+      onclick: () => select({ kind: "day", from: day, to: day }),
       onmouseenter: (e) => showCalTip(e.currentTarget, label, items),
       onmouseleave: hideCalTip,
       onfocus: (e) => showCalTip(e.currentTarget, label, items),
@@ -676,15 +683,23 @@ function renderCalendar(rows) {
     }
   }
   const monthName = new Date(y, m - 1, 1).toLocaleDateString("ru-RU", { month: "long", day: "numeric" }).split(" ")[1];
-  const weekBox = el("div", { class: "cal-weeks" }, ...weeks.map((w) =>
-    el("div", {}, w.from === w.to ? `${w.from} ${monthName}` : `${w.from}–${w.to} ${monthName}`, el("b", {}, w.sum ? money(w.sum) : "—"))));
+  const weekBox = el("div", { class: "cal-weeks" }, ...weeks.map((w) => {
+    const range = { kind: "week", from: iso(w.from), to: iso(w.to) };
+    const active = sel?.kind === "week" && sel.from === range.from;
+    const name = w.from === w.to ? `${w.from} ${monthName}` : `${w.from}–${w.to} ${monthName}`;
+    return el("button", { type: "button", class: `cal-week${active ? " active" : ""}`, "aria-pressed": String(active),
+      title: "Показать записи за неделю", onclick: () => select({ ...range, name }) },
+      name, el("b", {}, w.sum ? money(w.sum) : "—"));
+  }));
 
   const legend = el("div", { class: "cal-legend" }, ...CAL_GROUPS.slice(0, 5).map((g) =>
     el("span", {}, el("i", { style: `background:${g.color}` }), g.name)),
     el("span", {}, el("i", { class: "ring" }), "доход или долг"));
 
   box.append(grid, el("div", { class: "cal-below" },
-    renderCalendarDay(byDay.get(state.calDay) || []),
+    sel?.kind === "day"
+      ? renderCalendarDay(sel.from, byDay.get(sel.from) || [])
+      : renderCalendarRange(sel, rows.filter((r) => !sel || (r.date >= sel.from && r.date <= sel.to))),
     el("div", { class: "cal-aside" }, legend, weekBox)));
 }
 
@@ -735,15 +750,70 @@ function hideCalTip() {
   if (tip) tip.hidden = true;
 }
 
-function renderCalendarDay(items) {
-  const day = state.calDay;
+function plural(n, one, few, many) {
+  if (n % 10 === 1 && n % 100 !== 11) return one;
+  return [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? few : many;
+}
+
+function backToMonth() {
+  return el("button", { type: "button", class: "link-btn cal-back",
+    onclick: () => { state.calSel = null; renderCalendar(state.rows); } }, "← Весь месяц");
+}
+
+// Сводка за месяц или неделю: по категориям, как «Куда ушли деньги», но с числом записей
+function renderCalendarRange(sel, items) {
+  const [y, m] = state.month.split("-").map(Number);
+  const monthTitle = new Date(y, m - 1, 1).toLocaleDateString("ru-RU", { month: "long" });
+  const title = sel ? `Неделя ${sel.name}` : `${monthTitle[0].toUpperCase()}${monthTitle.slice(1)} целиком`;
+  const expenses = items.filter((r) => r.kind === "expense");
+  const spent = expenses.reduce((s, r) => s + r.amount, 0);
+  const byCat = new Map();
+  for (const r of expenses) {
+    const c = byCat.get(r.category) || { sum: 0, count: 0 };
+    c.sum += r.amount; c.count += 1;
+    byCat.set(r.category, c);
+  }
+  const days = new Set(expenses.map((r) => r.date)).size;
+  const panel = el("aside", { class: "cal-day", "aria-live": "polite" },
+    el("div", { class: "cal-day-head" }, el("h3", {}, title), sel ? backToMonth() : null),
+    el("p", { class: "cal-sub" }, items.length
+      ? `${items.length} ${plural(items.length, "запись", "записи", "записей")}` +
+        (days ? ` · в среднем ${money(Math.round(spent / days))} в день` : "")
+      : "Записей нет"),
+    spent ? el("p", { class: "cal-total" }, money(spent)) : null,
+  );
+  for (const [cat, c] of [...byCat].sort((a, b) => b[1].sum - a[1].sum)) {
+    panel.append(el("div", { class: "cal-it cal-cat" },
+      el("i", { style: `background:${CAL_COLOR[cat] || "#c9d3cc"}` }),
+      el("span", {}, state.names[cat] || cat,
+        el("small", {}, `${c.count} ${plural(c.count, "раз", "раза", "раз")} · ${Math.round((c.sum / spent) * 100)}%`),
+        el("span", { class: "cal-share" }, el("span", { style: `width:${Math.max(2, (c.sum / spent) * 100).toFixed(1)}%;background:${CAL_COLOR[cat] || "#c9d3cc"}` }))),
+      el("b", {}, money(c.sum)),
+    ));
+  }
+  const flows = [
+    ["income", "Доходы", "+"], ["lend", "Дал в долг", "→ "], ["repaid", "Вернули долг", "+"],
+  ].map(([kind, name, sign]) => {
+    const list = items.filter((r) => r.kind === kind);
+    if (!list.length) return null;
+    const sum = list.reduce((s, r) => s + r.amount, 0);
+    return el("div", { class: "cal-it cal-cat" }, el("i", { class: "ring" }),
+      el("span", {}, name, el("small", {}, `${list.length} ${plural(list.length, "запись", "записи", "записей")}`)),
+      el("b", { class: kind }, sign + money(sum)));
+  }).filter(Boolean);
+  if (flows.length) panel.append(el("p", { class: "cal-flows-title" }, "Кроме расходов"), ...flows);
+  panel.append(el("p", { class: "cal-hint" }, "Нажмите на день или неделю, чтобы увидеть их записи."));
+  return panel;
+}
+
+function renderCalendarDay(day, items) {
   const label = new Date(day + "T00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long", weekday: "long" });
   const spent = items.filter((r) => r.kind === "expense").reduce((s, r) => s + r.amount, 0);
   const count = items.length;
   const word = count % 10 === 1 && count % 100 !== 11 ? "запись"
     : [2, 3, 4].includes(count % 10) && ![12, 13, 14].includes(count % 100) ? "записи" : "записей";
   const panel = el("aside", { class: "cal-day", "aria-live": "polite" },
-    el("h3", {}, label),
+    el("div", { class: "cal-day-head" }, el("h3", {}, label), backToMonth()),
     el("p", { class: "cal-sub" }, count ? `${count} ${word}` : "Записей нет"),
     spent ? el("p", { class: "cal-total" }, money(spent)) : null,
   );
@@ -752,7 +822,8 @@ function renderCalendarDay(items) {
     panel.append(el("button", { type: "button", class: "cal-it", title: "Изменить запись", onclick: () => openEditor(label, [row]) },
       el("i", { style: `background:${CAL_COLOR[row.category] || "#c9d3cc"}` }),
       el("span", {}, row.counterparty || row.description || state.names[row.category],
-        el("small", {}, state.names[row.category] || row.category)),
+        row.counterparty || (row.description && row.description.toLowerCase() !== (state.names[row.category] || "").toLowerCase())
+          ? el("small", {}, state.names[row.category] || row.category) : null),
       el("b", { class: row.kind }, sign + money(row.amount)),
     ));
   }
