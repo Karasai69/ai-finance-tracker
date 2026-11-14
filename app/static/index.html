@@ -47,7 +47,7 @@
           <div><dt>Расходы</dt><dd id="sum-expense">0 ₸</dd></div>
           <div><dt>Дал в долг</dt><dd id="sum-lent">0 ₸</dd></div>
           <div id="repaid-box" hidden><dt>Вернули долг</dt><dd id="sum-repaid">0 ₸</dd></div>
-          <div id="saved-box"><dt>Отложил<small id="sum-saved-total"></small></dt><dd id="sum-saved">0 ₸</dd></div>
+          <div id="saved-box" class="saved-open" role="button" tabindex="0" title="Открыть накопления"><dt>Отложил <span class="saved-arrow" aria-hidden="true">›</span><small id="sum-saved-total"></small></dt><dd id="sum-saved">0 ₸</dd></div>
         </dl>
       </section>
 
@@ -163,6 +163,7 @@
             <div>
               <h2 id="savings-title">Накопления</h2>
               <p class="savings-hint">Чтобы записать, напишите «отложил 20 000» или «взял из накоплений 5 000».</p>
+              <button type="button" id="savings-open" class="btn savings-btn">История накоплений</button>
             </div>
             <dl class="savings-nums">
               <div><dt>Всего</dt><dd id="savings-total">0 ₸</dd></div>
@@ -258,6 +259,33 @@
         <li>Выберите «Установить приложение» или «Добавить на главный экран».</li>
       </ol>
     </div>
+  </dialog>
+
+  <dialog id="savings-dialog" class="editor" aria-labelledby="sv-title">
+    <div class="editor-head">
+      <h2 id="sv-title">Накопления</h2>
+      <button type="button" id="sv-close" class="icon-btn" aria-label="Закрыть">×</button>
+    </div>
+    <div class="sv-top">
+      <p class="sv-label">Сейчас в накоплениях</p>
+      <strong id="sv-total" class="sv-total">0 ₸</strong>
+    </div>
+    <form id="sv-form" class="sv-form">
+      <p class="sv-lead">Потратил часть отложенного? Запишите, сколько взяли, и сумма накоплений уменьшится.</p>
+      <div class="sv-fields">
+        <label>Сумма<input id="sv-amount" type="text" inputmode="decimal" placeholder="20 000" required></label>
+        <label>На что<input id="sv-note" type="text" maxlength="300" placeholder="например, ноутбук"></label>
+        <label>Дата<input id="sv-date" type="date" required></label>
+      </div>
+      <div class="sv-actions">
+        <span id="sv-status" class="editor-note" role="status"></span>
+        <button type="submit" class="btn primary" value="out">Взял из накоплений</button>
+        <button type="submit" class="btn ghost" value="in">Отложил</button>
+      </div>
+    </form>
+    <h3 class="sv-history-title">История</h3>
+    <ul id="sv-list" class="sv-list"></ul>
+    <p class="sv-foot">Удаляйте запись, только если она ошибочная. Если деньги потрачены, нажмите «Взял из накоплений»: так история останется честной.</p>
   </dialog>
 
   <dialog id="account-dialog" class="editor" aria-labelledby="account-title">

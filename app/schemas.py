@@ -83,6 +83,13 @@ class TransactionOut(ParsedItem):
     created_at: datetime
 
 
+class Savings(BaseModel):
+    """Все записи накоплений (отложил / взял обратно) и сколько лежит сейчас."""
+
+    total: float
+    items: list[TransactionOut]
+
+
 class CategoryTotal(BaseModel):
     category: str
     name: str

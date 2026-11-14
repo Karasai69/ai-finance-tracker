@@ -41,6 +41,7 @@ from app.schemas import (
     ParseRequest,
     ParseResponse,
     SaveRequest,
+    Savings,
     Summary,
     TransactionOut,
     TransactionUpdate,
@@ -374,6 +375,17 @@ def _savings_total(db: Session, user_id: int) -> float:
     """Сколько всего лежит в накоплениях: всё отложенное минус всё взятое обратно."""
     sums = _sum_by(db, Transaction.kind, Transaction.user_id == user_id, Transaction.kind.in_([SAVE, UNSAVE]))
     return round(sums.get(SAVE, 0.0) - sums.get(UNSAVE, 0.0), 2)
+
+
+@app.get("/api/savings", response_model=Savings)
+def savings(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """История накоплений за всё время: сначала новые."""
+    rows = db.scalars(
+        select(Transaction)
+        .where(Transaction.user_id == user.id, Transaction.kind.in_([SAVE, UNSAVE]))
+        .order_by(Transaction.date.desc(), Transaction.id.desc())
+    ).all()
+    return Savings(total=_savings_total(db, user.id), items=rows)
 
 
 # ---------- Обзор года ----------

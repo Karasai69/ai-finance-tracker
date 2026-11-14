@@ -1233,6 +1233,7 @@ async function undoDelete() {
     setStatus(items.length > 1 ? `Вернул ${items.length} записи` : "Запись возвращена");
     await refresh();
     if (document.body.dataset.screen === "stats") loadYear();
+    if ($("savings-dialog").open) loadSavings();
   } catch (error) {
     setStatus(error.message, true);
   }
@@ -1240,6 +1241,95 @@ async function undoDelete() {
 
 const restorable = (row) => ({ date: row.date, amount: row.amount, category: row.category,
   description: row.description || "", counterparty: row.counterparty || null });
+
+// ---------- Накопления: история, «взял» и удаление ошибочных записей ----------
+
+function openSavings() {
+  $("sv-date").value = todayISO();
+  $("sv-status").textContent = "";
+  $("savings-dialog").showModal();
+  loadSavings();
+}
+
+async function loadSavings() {
+  try {
+    renderSavings(await api("/api/savings"));
+  } catch (error) {
+    $("sv-list").replaceChildren(el("li", { class: "sv-empty" }, error.message));
+  }
+}
+
+function renderSavings(data) {
+  $("sv-total").textContent = money(data.total);
+  $("sv-total").classList.toggle("neg", data.total < 0);
+  const list = $("sv-list");
+  if (!data.items.length) {
+    list.replaceChildren(el("li", { class: "sv-empty" }, "Пока пусто. Напишите «отложил 20 000» — запись появится здесь."));
+    return;
+  }
+  list.replaceChildren(...data.items.map(savingsRow));
+}
+
+function savingsRow(row) {
+  const out = row.kind === "unsave";
+  const date = new Date(`${row.date}T00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
+  const what = row.description || (out ? "Взял из накоплений" : "Отложил");
+  const yes = el("button", { type: "button", class: "btn danger-fill" }, "Да, удалить");
+  const no = el("button", { type: "button", class: "btn ghost" }, "Нет");
+  const ask = el("div", { class: "debt-confirm row-confirm", hidden: "" },
+    el("p", {}, `Удалить запись «${what}, ${money(row.amount)}»?`),
+    el("div", { class: "debt-confirm-actions" }, yes, no));
+  const remove = el("button", { type: "button", class: "icon-btn", "aria-label": `Удалить запись «${what}»`, title: "Удалить" }, "×");
+  const item = el("li", { class: "sv-row" },
+    el("div", { class: "sv-main" },
+      el("span", { class: "sv-date" }, date),
+      el("span", { class: "sv-what" }, el("b", {}, out ? "Взял" : "Отложил"), row.description ? ` · ${row.description}` : ""),
+      el("span", { class: `sv-amount ${out ? "out" : "in"}` }, `${out ? "−" : "+"}${money(row.amount)}`),
+      remove),
+    ask);
+  remove.addEventListener("click", () => { ask.hidden = false; yes.focus(); });
+  no.addEventListener("click", () => { ask.hidden = true; });
+  yes.addEventListener("click", async () => {
+    yes.disabled = true;
+    try {
+      await api(`/api/transactions/${row.id}`, { method: "DELETE" });
+      showUndo(`Запись «${what}» удалена`, [restorable(row)]);
+      await Promise.all([loadSavings(), refresh()]);
+    } catch (error) {
+      yes.disabled = false;
+      ask.querySelector("p").textContent = error.message;
+    }
+  });
+  return item;
+}
+
+async function saveSavings(event) {
+  event.preventDefault();
+  const out = event.submitter?.value !== "in";
+  const amount = Number($("sv-amount").value.replace(/\s/g, "").replace(",", "."));
+  const status = $("sv-status");
+  if (!(amount > 0)) {
+    status.textContent = "Введите сумму больше нуля";
+    $("sv-amount").focus();
+    return;
+  }
+  const buttons = $("sv-form").querySelectorAll("button");
+  buttons.forEach((b) => (b.disabled = true));
+  try {
+    await api("/api/transactions", { method: "POST", body: JSON.stringify({ items: [{
+      date: $("sv-date").value || todayISO(), amount, category: out ? "savings_out" : "savings",
+      description: $("sv-note").value.trim(),
+    }] }) });
+    $("sv-amount").value = "";
+    $("sv-note").value = "";
+    status.textContent = "";
+    await Promise.all([loadSavings(), refresh()]);
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    buttons.forEach((b) => (b.disabled = false));
+  }
+}
 
 // ---------- Экраны и кнопка «Назад» ----------
 // У каждого экрана свой адрес (#calendar, #table, #stats, #debts) в истории браузера:
@@ -1793,6 +1883,13 @@ async function init() {
   $("logout").addEventListener("click", logout);
   $("open-account").addEventListener("click", openAccount);
   $("account-close").addEventListener("click", () => $("account-dialog").close());
+  $("saved-box").addEventListener("click", openSavings);
+  $("saved-box").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openSavings(); }
+  });
+  $("savings-open").addEventListener("click", openSavings);
+  $("sv-close").addEventListener("click", () => $("savings-dialog").close());
+  $("sv-form").addEventListener("submit", saveSavings);
   $("password-form").addEventListener("submit", changePassword);
   $("delete-form").addEventListener("submit", deleteAccount);
   $("del-confirm").addEventListener("change", (e) => ($("del-submit").disabled = !e.target.checked));

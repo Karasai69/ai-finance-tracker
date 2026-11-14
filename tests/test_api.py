@@ -441,6 +441,14 @@ def test_savings_change_balance_and_total(make_client):
     assert s["expense"] == 4000  # отложенное — не расход
     assert s["balance"] == 150000 - 4000 - 25000
 
+    history = c.get("/api/savings").json()
+    assert history["total"] == 45000
+    assert [(i["date"], i["category"], i["amount"]) for i in history["items"]] == [
+        ("2026-11-03", "savings_out", 5000),
+        ("2026-11-02", "savings", 30000),
+        ("2026-10-06", "savings", 20000),
+    ]
+
 
 def test_year_overview(make_client):
     c = make_client()
