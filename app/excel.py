@@ -11,12 +11,12 @@ from openpyxl.utils import get_column_letter
 
 from app.categories import CATEGORIES, KINDS
 
-TEAL = "0F4F54"
-PAPER = "EEF1EC"
+WINE = "7A1F33"  # бордо, как на сайте
+PAPER = "F4EFE6"
 HEAD_FONT = Font(bold=True, color="FFFFFF")
-HEAD_FILL = PatternFill("solid", fgColor=TEAL)
+HEAD_FILL = PatternFill("solid", fgColor=WINE)
 TOTAL_FILL = PatternFill("solid", fgColor=PAPER)
-RULE = Border(bottom=Side(style="thin", color="C9D3CC"))
+RULE = Border(bottom=Side(style="thin", color="DDD3C2"))
 MONEY = "#,##0;-#,##0;\"\""  # пустая клетка вместо нуля
 MONEY_2 = "#,##0.##"
 WEEKDAYS = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
