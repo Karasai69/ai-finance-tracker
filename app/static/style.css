@@ -754,3 +754,15 @@ body[data-screen="debts"] .debts-total { font-size: 26px; }
   body:not([data-screen="home"]) .back-btn:active { background: rgba(246, 236, 225, .12); }
   body:not([data-screen="home"]) .rail-top { gap: 8px; }
 }
+
+/* Удаление долга */
+.debt-foot { margin-top: 8px; text-align: right; }
+.debt-remove { font-size: 13px; color: var(--muted); }
+.debt-remove:hover { color: var(--brick); }
+.debt-confirm { margin-top: 12px; padding: 12px; border: 1px solid rgba(178, 58, 42, .35); background: rgba(178, 58, 42, .05); border-radius: 3px; }
+.debt-confirm p { margin: 0 0 10px; font-size: 14px; }
+.debt-confirm-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.debt-confirm .btn { padding: 7px 14px; font-size: 14px; }
+.btn.danger-fill { background: var(--brick); border-color: var(--brick); color: #fff; }
+.btn.danger-fill:hover { background: #962f22; }
+.debt-closed-item .debt-remove { margin-left: 8px; font-size: 12.5px; }

@@ -400,3 +400,25 @@ def test_transcribe_voice(make_client, monkeypatch):
     monkeypatch.setattr(main, "transcribe", broken)
     r = c.post("/api/transcribe", content=b"x", headers={"content-type": "audio/webm"})
     assert r.status_code == 502 and "Не расслышал" in r.json()["detail"]
+
+
+def test_delete_debt_removes_all_its_records_only(make_client):
+    alice, bob = make_client(), make_client()
+    alice.post("/api/auth/register", json={"email": "alice@kz.kz", "password": "password123"})
+    bob.post("/api/auth/register", json={"email": "bob@kz.kz", "password": "password123"})
+    items = [
+        {"date": "2026-10-09", "amount": 15000, "category": "lend", "counterparty": "Айбек"},
+        {"date": "2026-11-02", "amount": 5000, "category": "repaid", "counterparty": "айбек "},
+        {"date": "2026-11-03", "amount": 3000, "category": "lend", "counterparty": "Дана"},
+        {"date": "2026-11-03", "amount": 700, "category": "transport", "description": "такси"},
+    ]
+    alice.post("/api/transactions", json={"items": items})
+    bob.post("/api/transactions", json={"items": [items[0]]})
+
+    r = alice.request("DELETE", "/api/debts", params={"person": "Айбек"})
+    assert r.status_code == 200 and r.json() == {"deleted": 2}
+    assert [d["person"] for d in alice.get("/api/debts").json()] == ["Дана"]
+    nov = alice.get("/api/transactions", params={"month": "2026-11"}).json()
+    assert {t["category"] for t in nov} == {"lend", "transport"}  # такси и Дана на месте
+    assert alice.request("DELETE", "/api/debts", params={"person": "Айбек"}).status_code == 404
+    assert bob.get("/api/debts").json()[0]["person"] == "Айбек"  # чужой долг не тронут

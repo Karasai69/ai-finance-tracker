@@ -386,6 +386,42 @@ function renderDailyChart(summary) {
 
 // ---------- Долги ----------
 
+// Удаление долга целиком: кнопка и подтверждение прямо в карточке (без всплывающих окон браузера)
+function debtRemover(debt) {
+  const panel = el("div", { class: "debt-confirm", hidden: "" });
+  const button = el("button", { type: "button", class: "link-btn debt-remove" }, "Удалить долг");
+  const yes = el("button", { type: "button", class: "btn danger-fill" }, "Удалить");
+  const no = el("button", { type: "button", class: "btn ghost" }, "Отмена");
+  const note = el("span", { class: "editor-note", role: "status" });
+  panel.append(
+    el("p", {}, `Удалить все записи долга «${debt.person}»: дал ${money(debt.lent)}`,
+      debt.repaid ? `, вернул ${money(debt.repaid)}` : "", "? Отменить это нельзя."),
+    el("div", { class: "debt-confirm-actions" }, yes, no, note),
+  );
+  button.addEventListener("click", () => { panel.hidden = false; button.hidden = true; });
+  no.addEventListener("click", () => { panel.hidden = true; button.hidden = false; });
+  yes.addEventListener("click", async () => {
+    yes.disabled = true;
+    try {
+      await api(`/api/debts?person=${encodeURIComponent(debt.person)}`, { method: "DELETE" });
+      setStatus(`Долг «${debt.person}» удалён`);
+      await refresh();
+    } catch (error) {
+      note.textContent = error.message;
+      yes.disabled = false;
+    }
+  });
+  return { button, panel };
+}
+
+function closedDebtRow(debt) {
+  const r = debtRemover(debt);
+  return el("div", { class: "debt-closed-item" },
+    el("div", { class: "debt-closed" }, el("span", {}, debt.person),
+      el("span", {}, `${money(debt.lent)} — вернул полностью`, r.button)),
+    r.panel);
+}
+
 function renderDebts() {
   const open = state.debts.filter((d) => d.balance > 0);
   const closed = state.debts.filter((d) => d.balance <= 0);
@@ -428,6 +464,7 @@ function renderDebts() {
       if (!form.hidden) amount.focus();
     });
     const share = debt.lent ? Math.min(100, (debt.repaid / debt.lent) * 100) : 0;
+    const remove = debtRemover(debt);
     box.append(el("div", { class: "debt" },
       el("div", { class: "debt-main" },
         el("span", { class: "debt-avatar", "aria-hidden": "true" }, debt.person.trim()[0]?.toUpperCase() || "?"),
@@ -439,12 +476,13 @@ function renderDebts() {
       debt.repaid ? el("div", { class: "debt-progress", title: `Вернул ${Math.round(share)}%` },
         el("span", { style: `width:${share.toFixed(1)}%` })) : null,
       form,
+      remove.panel,
+      el("div", { class: "debt-foot" }, remove.button),
     ));
   }
   if (closed.length) {
     const list = el("div", { class: "debts-closed", hidden: "" }, ...closed.map((d) =>
-      el("div", { class: "debt-closed" }, el("span", {}, d.person),
-        el("span", {}, `${money(d.lent)} — вернул полностью`))));
+      closedDebtRow(d)));
     const toggle = el("button", { type: "button", class: "link-btn" }, `Закрытые долги (${closed.length})`);
     toggle.addEventListener("click", () => { list.hidden = !list.hidden; });
     box.append(el("div", { class: "debts-closed-wrap" }, toggle, list));

@@ -390,6 +390,26 @@ def debts(user: User = Depends(get_current_user), db: Session = Depends(get_db))
     return sorted(people.values(), key=lambda d: (-d.balance, d.person))
 
 
+@app.delete("/api/debts")
+def delete_debt(
+    person: str = Query(min_length=1, max_length=100),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Удаляет долг целиком: все записи «дал в долг» и «вернул» с этим человеком (за все месяцы)."""
+    key = person.strip().casefold()
+    rows = db.scalars(
+        select(Transaction).where(Transaction.user_id == user.id, Transaction.kind.in_(sorted(PERSON_KINDS)))
+    ).all()
+    doomed = [r for r in rows if ((r.counterparty or "").strip() or "Без имени").casefold() == key]
+    if not doomed:
+        raise HTTPException(404, "Такого долга нет")
+    for row in doomed:
+        db.delete(row)
+    db.commit()
+    return {"deleted": len(doomed)}
+
+
 # ---------- Разбор месяца ----------
 
 @app.post("/api/insights", response_model=Insights)
