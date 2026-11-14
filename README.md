@@ -2,90 +2,93 @@
 
 # AI Finance Tracker
 
-**Учёт личных финансов обычным текстом.** Пишете «такси 1 200, обед 1 500, брат прислал 10 000» — ИИ раскладывает траты по категориям, а календарь, таблица, итоги и долги считаются сами.
+**English** · [Русский](README.ru.md)
+
+**Personal finance tracking in plain text.** Type "taxi 1 200, lunch 1 500, my brother sent 10 000" — an LLM splits it into categorized entries, and the calendar, table, monthly totals and debts update on their own.
 
 [![tests](https://github.com/Karasai69/ai-finance-tracker/actions/workflows/tests.yml/badge.svg)](https://github.com/Karasai69/ai-finance-tracker/actions/workflows/tests.yml)
 ![Python](https://img.shields.io/badge/Python-3.12-4a1524)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-4a1524)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4a1524)
 
-### [▶ Открыть демо](https://ai-finance-tracker-05rj.onrender.com) — кнопка «Посмотреть демо без регистрации»
+### [▶ Live demo](https://ai-finance-tracker-05rj.onrender.com) — click «Посмотреть демо без регистрации» (view demo, no sign-up)
 
-<img src="docs/screenshots/demo.gif" alt="Ввод текстом: ИИ разбирает траты, записи появляются в календаре" width="860">
+<img src="docs/screenshots/demo.gif" alt="Typing expenses in plain text: the LLM parses them and they appear in the calendar" width="860">
 
 </div>
 
-> Сервер работает на бесплатном тарифе Render и засыпает без посетителей, поэтому первое открытие может занять до минуты.
+> The interface is in Russian — the app was built for the Kazakhstan market (amounts in tenge, ₸).
+> It runs on Render's free tier and sleeps when idle, so the first load can take up to a minute.
 
-## Зачем
+## Why
 
-С начала 2026 года я каждый день записывал расходы в Google Sheets вручную: дата, категория, сумма. Это приложение делает то же самое, но запись занимает пять секунд — достаточно написать или надиктовать фразу. Свои записи за год я перенёс сюда импортом из Excel.
+Since early 2026 I logged every expense by hand in Google Sheets: date, category, amount. This app does the same job, but an entry takes five seconds — type or dictate one sentence. I migrated my own year of records into it via the Excel import.
 
-## Возможности
+## Features
 
-**Ввод**
-- Свободный текст или голос — ИИ находит суммы, категории, даты («вчера»), доходы и долги
-- Предпросмотр перед сохранением: можно поправить категорию, сумму и дату
-- ИИ учится на исправлениях: переложили «самсу» в «Кафе» — в следующий раз она попадёт туда сама
-- Если ИИ недоступен, работает запасной разбор по ключевым словам
+**Input**
+- Free text or voice — the LLM extracts amounts, categories, dates ("yesterday"), income and debts
+- Preview before saving: category, amount and date can be corrected
+- Learns from corrections: move "samsa" to "Cafe" once and it lands there next time
+- Keyword-based fallback parser when the LLM is unavailable
 
-**Обзор месяца**
-- Календарь: сумма за каждый день, цвет по нагрузке, отметки «крупная трата», подсказка с разбивкой при наведении, сводка за месяц, неделю или день
-- Таблица «дни × категории», как в Google Sheets, и список записей
-- Остаток, доходы, расходы, долги; сравнение с теми же днями прошлого месяца — общее и по каждой категории
-- Лимиты по категориям с предупреждением о превышении
-- Долги по людям за всё время с отметкой «Вернул» (полностью или частично)
-- «Разбор месяца» от ИИ: куда ушли деньги и где реально сэкономить. Числа считает приложение, ИИ только формулирует — поэтому он не выдумывает цифры
+**Monthly overview**
+- Calendar: daily totals, heat shading, "big spend" badges, per-day breakdown on hover, summary for the month, a week or a day
+- Spreadsheet-style "days × categories" table and a plain list
+- Balance, income, expenses, debts; comparison with the same days of the previous month — overall and per category
+- Per-category budgets with over-limit warnings
+- Who owes me what, across all months, with full or partial "paid back"
+- "Month review" by the LLM: where the money went and realistic ways to save. The app computes every number; the model only phrases them, so it can't invent figures
 
-**Данные и аккаунт**
-- Выгрузка в Excel (лист записей и лист «по дням») и загрузка обратно
-- Регистрация, смена пароля (другие устройства выходят из аккаунта), удаление аккаунта со всеми данными
-- Демо-аккаунт одной кнопкой: данные пересоздаются при каждом входе
-- Устанавливается на телефон как приложение (PWA)
+**Data and account**
+- Excel export (entries sheet + "by day" sheet) and import back
+- Sign-up, password change (logs out other devices), account deletion with all data
+- One-click demo account, re-seeded on every login
+- Installable on a phone as a PWA
 
-## Скриншоты
+## Screenshots
 
-| Календарь и подсказка дня | Таблица «дни × категории» |
+| Calendar with day tooltip | "Days × categories" table |
 | --- | --- |
-| ![Календарь](docs/screenshots/calendar-hover.png) | ![Таблица](docs/screenshots/table.png) |
+| ![Calendar](docs/screenshots/calendar-hover.png) | ![Table](docs/screenshots/table.png) |
 
-| Телефон | Разбор месяца от ИИ |
+| Phone | LLM month review |
 | --- | --- |
-| <img src="docs/screenshots/phone.png" alt="Телефон" width="300"> | ![Разбор месяца](docs/screenshots/review.png) |
+| <img src="docs/screenshots/phone.png" alt="Phone" width="300"> | ![Month review](docs/screenshots/review.png) |
 
-## Как устроено
+## Architecture
 
-<img src="docs/architecture.png" alt="Схема: браузер → FastAPI → LLM и PostgreSQL; GitHub Actions и автодеплой на Render" width="860">
+<img src="docs/architecture.png" alt="Browser → FastAPI → LLM and PostgreSQL; GitHub Actions CI and auto-deploy to Render" width="860">
 
-1. Текст уходит на `POST /api/parse`. Модель возвращает JSON со списком операций, ответ проверяется Pydantic: неизвестная категория становится «Другое», запись без суммы отбрасывается, тип операции всегда следует из категории.
-2. К результату применяются привычки пользователя — последние исправленные категории для тех же описаний.
-3. Пользователь проверяет предпросмотр и сохраняет записи (`POST /api/transactions`).
-4. Итоги, сравнения и долги считаются SQL-запросами с `GROUP BY`; каждый запрос ограничен записями текущего пользователя.
-5. Для «Разбора месяца» приложение само считает факты (доли, средний расход, крупные покупки, изменения к прошлому месяцу), а модель только превращает их в текст.
+1. Text goes to `POST /api/parse`. The model returns JSON with a list of operations, validated by Pydantic: an unknown category becomes "Other", entries without an amount are dropped, and the operation type is always derived from the category.
+2. The user's habits are applied on top — the latest corrected categories for the same descriptions.
+3. The user reviews the preview and saves (`POST /api/transactions`).
+4. Totals, comparisons and debts are SQL `GROUP BY` queries, each scoped to the current user.
+5. For the month review the app computes the facts itself (shares, daily average, biggest purchases, changes vs. last month); the model only turns them into sentences.
 
-### Что было интересно решить
+### Interesting problems
 
-- **ИИ не должен ошибаться в деньгах.** Модель никогда не считает: суммы приходят уже отформатированными, а в запрос не попадает то, чего нет (например, пустой прошлый месяц), — иначе она начинала «сравнивать» с нулём.
-- **Выход на всех устройствах после смены пароля** без таблицы сессий: в JWT лежит короткий отпечаток хеша пароля, и после смены старые токены перестают совпадать.
-- **Защита от перебора пароля** — ограничение попыток по IP и email, тот же лимит при смене пароля и удалении аккаунта.
-- **Миграции на живой базе.** Схема меняется только миграциями Alembic, они применяются при старте; базы, созданные до появления миграций, распознаются и «догоняются».
+- **The LLM must not get money wrong.** The model never calculates: amounts arrive pre-formatted, and missing data (e.g. an empty previous month) is left out of the prompt entirely — otherwise it started "comparing" against zero.
+- **Logging out every device after a password change** without a sessions table: the JWT carries a short fingerprint of the password hash, so old tokens stop matching once the password changes.
+- **Brute-force protection** — attempts are limited per IP and email; the same limit guards password change and account deletion.
+- **Migrations on a live database.** The schema changes only through Alembic migrations applied at startup; databases created before migrations existed are detected and brought up to date.
 
-## Стек
+## Tech stack
 
-| Часть | Технологии |
+| Area | Technologies |
 | --- | --- |
 | Backend | Python 3.12, FastAPI, SQLAlchemy 2.0, Alembic, Pydantic v2 |
-| База данных | PostgreSQL (продакшен и CI), SQLite (локально) |
-| Авторизация | JWT в httpOnly cookie, scrypt, ограничение попыток |
-| ИИ | LLM через OpenAI-совместимый API (Groq; подойдут Gemini, OpenAI) |
-| Frontend | HTML, CSS, JavaScript без фреймворков, SVG, Web Speech API, PWA |
-| Файлы | openpyxl — выгрузка и загрузка Excel |
-| Инфраструктура | Docker, Docker Compose, GitHub Actions, Render, Neon |
-| Тесты | pytest — около 80 тестов: разбор текста, ответы ИИ, авторизация, изоляция данных пользователей, миграции, Excel |
+| Database | PostgreSQL (production and CI), SQLite (local) |
+| Auth | JWT in an httpOnly cookie, scrypt, rate limiting |
+| AI | LLM via an OpenAI-compatible API (Groq; Gemini or OpenAI also work) |
+| Frontend | HTML, CSS, vanilla JavaScript, SVG, Web Speech API, PWA |
+| Files | openpyxl — Excel export and import |
+| Infrastructure | Docker, Docker Compose, GitHub Actions, Render, Neon |
+| Tests | pytest — ~80 tests: text parsing, LLM responses, auth, per-user data isolation, migrations, Excel |
 
-## Запуск на компьютере
+## Running locally
 
-Нужен Python 3.10 или новее.
+Requires Python 3.10+.
 
 ```bash
 git clone https://github.com/Karasai69/ai-finance-tracker.git
@@ -96,109 +99,72 @@ python -m venv .venv
 # source .venv/bin/activate     # macOS / Linux
 
 pip install -r requirements-dev.txt
-copy .env.example .env          # Windows; на macOS / Linux: cp .env.example .env
+cp .env.example .env            # Windows: copy .env.example .env
 
 uvicorn app.main:app --reload
 ```
 
-Откройте http://127.0.0.1:8000 и зарегистрируйтесь. Документация API: http://127.0.0.1:8000/docs.
+Open http://127.0.0.1:8000 and sign up. API docs: http://127.0.0.1:8000/docs.
 
-### Подключение ИИ (бесплатно, Groq)
+### Enabling the LLM (free, Groq)
 
-1. Зарегистрируйтесь на https://console.groq.com и создайте ключ в разделе **API Keys**.
-2. Вставьте его в `.env`:
+1. Sign up at https://console.groq.com and create a key under **API Keys**.
+2. Put it into `.env`:
    ```
-   AI_API_KEY=ваш_ключ
+   AI_API_KEY=your_key
    AI_BASE_URL=https://api.groq.com/openai/v1
    AI_MODEL=openai/gpt-oss-20b
    ```
-   Актуальный список моделей: https://console.groq.com/docs/models
-3. Перезапустите сервер. Под полем ввода появится надпись «Текст разбирает ИИ».
+3. Restart the server. Any provider with an OpenAI-compatible API works — change `AI_BASE_URL` and `AI_MODEL`.
 
-Подойдёт и другой провайдер с OpenAI-совместимым API: поменяйте `AI_BASE_URL` и `AI_MODEL`.
-
-### Запуск в Docker вместе с PostgreSQL
+### Docker with PostgreSQL
 
 ```bash
 docker compose up --build
 ```
 
-Приложение откроется на http://127.0.0.1:8000, данные хранятся в PostgreSQL.
+## Deploy: Render + Neon (free)
 
-## Деплой: Render + Neon (бесплатно)
+1. **Database.** Create a project at https://neon.com and copy the `postgresql://...` connection string.
+2. **Server.** On https://render.com: **New → Blueprint**, pick this repository — Render reads `render.yaml`.
+3. Set `DATABASE_URL` (from Neon), `AI_API_KEY` and `AI_MODEL`. Render generates `SECRET_KEY` itself.
 
-1. **База.** Создайте проект на https://neon.com и скопируйте строку подключения (Connection string) вида `postgresql://...`.
-2. **Сервер.** На https://render.com: **New → Blueprint**, выберите этот репозиторий. Render прочитает `render.yaml`.
-3. Заполните переменные: `DATABASE_URL` — строка из Neon, `AI_API_KEY` — ключ Groq, `AI_MODEL` — название модели. `SECRET_KEY` Render сгенерирует сам.
-4. После сборки сайт будет доступен по адресу вида `https://ai-finance-tracker.onrender.com`.
-
-На бесплатном тарифе Render сервер засыпает после 15 минут без запросов, поэтому первое открытие может занять около минуты.
-
-## Тесты
+## Tests
 
 ```bash
 pytest
 ```
 
-GitHub Actions запускает тесты на каждый push дважды — на SQLite и на PostgreSQL — и проверяет сборку Docker-образа.
-
-## Структура
-
-```
-app/
-  main.py          # FastAPI: маршруты API и отдача страницы
-  auth.py          # регистрация, вход, демо, смена пароля, удаление аккаунта
-  security.py      # хеширование паролей и JWT
-  ratelimit.py     # ограничение попыток
-  models.py        # таблицы users, transactions, budgets (SQLAlchemy)
-  schemas.py       # проверка данных (Pydantic)
-  categories.py    # категории и ключевые слова
-  periods.py       # месяцы и периоды для сравнения
-  personalize.py   # привычки пользователя: «описание → категория»
-  insights.py      # разбор месяца: факты для ИИ и запасные правила
-  importer.py      # загрузка из Excel и CSV
-  excel.py         # выгрузка в Excel
-  demo.py          # данные демо-аккаунта
-  migrate.py       # применение миграций при старте
-  parser/
-    ai.py          # разбор текста языковой моделью
-    rules.py       # запасной разбор без ИИ
-  static/          # index.html, style.css, app.js, service worker, иконки
-migrations/        # миграции Alembic
-tests/             # pytest
-docs/screenshots/  # картинки для README
-Dockerfile, docker-compose.yml, render.yaml, .github/workflows/tests.yml
-```
+GitHub Actions runs the suite on every push twice — on SQLite and on PostgreSQL — and checks that the Docker image builds.
 
 ## API
 
-Документация с примерами — на `/docs` (Swagger). Все маршруты, кроме входа, регистрации, демо, `/api/health` и `/api/categories`, требуют входа.
+Interactive docs at `/docs` (Swagger). Everything except sign-up, login, demo, `/api/health` and `/api/categories` requires authentication.
 
-| Метод | Путь | Что делает |
+| Method | Path | Purpose |
 | --- | --- | --- |
-| POST | `/api/auth/register` · `/login` · `/logout` | Регистрация, вход, выход |
-| POST | `/api/auth/demo` | Вход в демо-аккаунт |
-| GET | `/api/auth/me` | Текущий пользователь |
-| POST | `/api/auth/password` | Смена пароля |
-| DELETE | `/api/auth/account` | Удаление аккаунта и данных |
-| POST | `/api/parse` | Текст → список записей (без сохранения) |
-| POST | `/api/transactions` | Сохранить записи |
-| GET | `/api/transactions?month=2026-11` | Записи за месяц |
-| PATCH / DELETE | `/api/transactions/{id}` | Изменить или удалить запись |
-| GET | `/api/summary?month=2026-11` | Итоги месяца и сравнение с прошлым |
-| POST | `/api/insights?month=2026-11` | Разбор месяца |
-| GET | `/api/debts` | Долги по людям |
-| GET · PUT | `/api/budgets` · `/api/budgets/{category}` | Лимиты |
-| GET | `/api/export.xlsx?month=2026-11` (или `?all=true`) | Выгрузка в Excel |
-| POST | `/api/import` | Загрузка Excel или CSV |
-| GET | `/api/categories` · `/api/health` | Категории, статус сервера и ИИ |
+| POST | `/api/auth/register` · `/login` · `/logout` | Sign up, log in, log out |
+| POST | `/api/auth/demo` | Log into the demo account |
+| GET | `/api/auth/me` | Current user |
+| POST | `/api/auth/password` | Change password |
+| DELETE | `/api/auth/account` | Delete account and data |
+| POST | `/api/parse` | Text → list of entries (not saved) |
+| POST | `/api/transactions` | Save entries |
+| GET | `/api/transactions?month=2026-11` | Entries for a month |
+| PATCH / DELETE | `/api/transactions/{id}` | Edit or delete an entry |
+| GET | `/api/summary?month=2026-11` | Monthly totals and comparison |
+| POST | `/api/insights?month=2026-11` | Month review |
+| GET | `/api/debts` | Debts by person |
+| GET · PUT | `/api/budgets` · `/api/budgets/{category}` | Budgets |
+| GET | `/api/export.xlsx?month=2026-11` (or `?all=true`) | Excel export |
+| POST | `/api/import` | Excel or CSV import |
 
-## Дальше
+## Roadmap
 
-- [ ] Фото чека → записи
-- [ ] Импорт банковской выписки
-- [ ] Повторяющиеся платежи (аренда, подписки)
+- [ ] Receipt photo → entries
+- [ ] Bank statement import
+- [ ] Recurring payments (rent, subscriptions)
 
-## Автор
+## Author
 
-Студент 4 курса КазНУ, «Компьютерная инженерия» — [github.com/Karasai69](https://github.com/Karasai69)
+4th-year Computer Engineering student at Al-Farabi Kazakh National University (KazNU) — [github.com/Karasai69](https://github.com/Karasai69)
