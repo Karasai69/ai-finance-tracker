@@ -106,15 +106,17 @@
             <h2 id="ledger-title">Записи</h2>
             <div class="tabs" role="tablist">
               <button type="button" role="tab" id="tab-table" class="tab" aria-selected="true">Таблица</button>
+              <button type="button" role="tab" id="tab-calendar" class="tab" aria-selected="false">Календарь</button>
               <button type="button" role="tab" id="tab-list" class="tab" aria-selected="false">Список</button>
             </div>
             <div class="ledger-actions">
-              <button type="button" id="import" class="export link-btn">Загрузить CSV</button>
-              <input type="file" id="import-file" accept=".csv,text/csv" hidden>
-              <a id="export" class="export" href="/api/export.csv">Скачать CSV</a>
+              <button type="button" id="import" class="export link-btn" title="Файл Excel в формате выгрузки (подойдёт и CSV)">Загрузить из Excel</button>
+              <input type="file" id="import-file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden>
+              <a id="export" class="export" href="/api/export.xlsx">Скачать Excel</a>
             </div>
           </div>
           <div id="view-table" class="table-wrap" tabindex="0" aria-label="Таблица расходов по дням"></div>
+          <div id="view-calendar" class="calendar" hidden></div>
           <div id="view-list" class="list" hidden></div>
         </section>
 
@@ -222,7 +224,7 @@
     <form id="delete-form" class="account-section danger-zone" novalidate>
       <h3>Удалить аккаунт</h3>
       <p class="account-lead">Все записи, долги и лимиты будут удалены навсегда, восстановить их нельзя.
-        Сначала можно <a href="/api/export.csv" download>скачать все записи в CSV</a>.</p>
+        Сначала можно <a href="/api/export.xlsx?all=true" download>скачать все записи в Excel</a>.</p>
       <label for="del-password">Пароль</label>
       <input id="del-password" type="password" autocomplete="current-password" required>
       <label class="check"><input id="del-confirm" type="checkbox"> Понимаю, что данные удалятся без возможности восстановления</label>

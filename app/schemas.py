@@ -58,7 +58,9 @@ class SaveRequest(BaseModel):
 
 
 class ImportRequest(BaseModel):
-    csv: str = Field(min_length=1, max_length=1_000_000)
+    """Либо текст CSV, либо файл Excel в base64 (так проще, чем multipart)."""
+    csv: str | None = Field(default=None, min_length=1, max_length=1_000_000)
+    xlsx: str | None = Field(default=None, min_length=1, max_length=7_000_000)
 
 
 class ImportResponse(BaseModel):

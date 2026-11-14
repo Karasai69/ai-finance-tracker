@@ -297,3 +297,31 @@ def test_delete_account_removes_all_data(make_client):
     assert again.post("/api/auth/register", json={"email": "alice@kz.kz", "password": "password123"}).status_code == 201
     assert again.get("/api/transactions", params={"month": "2026-11"}).json() == []
     assert len(bob.get("/api/transactions", params={"month": "2026-11"}).json()) == 1  # чужие данные не тронуты
+
+
+def test_excel_export_and_import_round_trip(make_client):
+    import base64
+
+    alice, bob = make_client(), make_client()
+    alice.post("/api/auth/register", json={"email": "alice@kz.kz", "password": "password123"})
+    bob.post("/api/auth/register", json={"email": "bob@kz.kz", "password": "password123"})
+    items = [
+        {"date": "2026-10-30", "amount": 1500, "category": "products", "description": "мясо"},
+        {"date": "2026-11-10", "amount": 300, "category": "transport", "description": "такси"},
+    ]
+    alice.post("/api/transactions", json={"items": items})
+
+    month = alice.get("/api/export.xlsx", params={"month": "2026-11"})
+    assert month.status_code == 200
+    assert month.headers["content-type"].startswith("application/vnd.openxmlformats")
+    everything = alice.get("/api/export.xlsx", params={"all": "true"})
+    assert 'filename="finance-all.xlsx"' in everything.headers["content-disposition"]
+
+    payload = {"xlsx": base64.b64encode(everything.content).decode()}
+    result = bob.post("/api/import", json=payload)
+    assert result.status_code == 201, result.text
+    assert result.json() == {"imported": 2, "months": ["2026-10", "2026-11"]}
+    assert bob.get("/api/transactions", params={"month": "2026-10"}).json()[0]["description"] == "мясо"
+
+    assert bob.post("/api/import", json={"xlsx": "!!!"}).status_code == 422
+    assert bob.post("/api/import", json={}).status_code == 422

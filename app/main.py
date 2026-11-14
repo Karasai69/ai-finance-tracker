@@ -1,3 +1,4 @@
+import base64
 import csv
 import hashlib
 import io
@@ -16,7 +17,8 @@ from app.auth import router as auth_router
 from app.categories import CATEGORIES, EXPENSE, KINDS, PERSON_KINDS, kind_of, normalize_category
 from app.config import settings
 from app.database import get_db
-from app.importer import parse_csv
+from app.excel import build_workbook
+from app.importer import parse_csv, parse_xlsx
 from app.insights import ai_insights, build_facts, rule_insights
 from app.migrate import run_migrations
 from app.parser.ai import AIParseError
@@ -161,9 +163,18 @@ def create_transactions(
 
 
 @app.post("/api/import", response_model=ImportResponse, status_code=201)
-def import_csv(body: ImportRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Загрузка CSV в формате выгрузки. Если в файле есть ошибки, не сохраняется ничего."""
-    items, errors = parse_csv(body.csv)
+def import_file(body: ImportRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Загрузка Excel или CSV в формате выгрузки. Если в файле есть ошибки, не сохраняется ничего."""
+    if body.xlsx:
+        try:
+            data = base64.b64decode(body.xlsx, validate=True)
+        except ValueError:
+            raise HTTPException(422, "Файл повреждён, попробуйте выбрать его ещё раз") from None
+        items, errors = parse_xlsx(data)
+    elif body.csv:
+        items, errors = parse_csv(body.csv)
+    else:
+        raise HTTPException(422, "Нет файла")
     if errors:
         shown = "; ".join(errors[:5]) + (f" и ещё {len(errors) - 5}" if len(errors) > 5 else "")
         raise HTTPException(422, f"Файл не загружен: {shown}")
@@ -178,7 +189,7 @@ def import_csv(body: ImportRequest, user: User = Depends(get_current_user), db: 
             kind=item.kind,
             description=item.description,
             counterparty=item.counterparty,
-            raw_text="импорт CSV",
+            raw_text="импорт файла",
         )
         for item in items
     )
@@ -422,6 +433,30 @@ def set_budget(
         budget.monthly_limit = body.limit
     db.commit()
     return list_budgets(user=user, db=db)
+
+
+@app.get("/api/export.xlsx")
+def export_xlsx(
+    month: str | None = Query(default=None, pattern=MONTH_PATTERN),
+    all_time: bool = Query(default=False, alias="all", description="Все записи за всё время"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Excel: лист «Записи» (можно загрузить обратно) и лист «По дням»."""
+    if all_time:
+        rows = list(db.scalars(
+            select(Transaction).where(Transaction.user_id == user.id).order_by(Transaction.date, Transaction.id)
+        ))
+        name, title = "finance-all", "Финансы — все записи"
+    else:
+        month = month or current_month()
+        rows = list(reversed(_month_rows(month, user, db)))
+        name, title = f"finance-{month}", f"Финансы — {month}"
+    return Response(
+        content=build_workbook(rows, title),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{name}.xlsx"'},
+    )
 
 
 @app.get("/api/export.csv")

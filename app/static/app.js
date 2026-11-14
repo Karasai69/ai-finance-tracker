@@ -94,7 +94,7 @@ function setMonth(month) {
   if (month !== state.month) resetReview();
   state.month = month;
   $("month-label").textContent = monthLabel(month);
-  $("export").href = `/api/export.csv?month=${month}`;
+  $("export").href = `/api/export.xlsx?month=${month}`;
   refresh();
 }
 
@@ -591,6 +591,128 @@ function renderTable(rows) {
   if (todayRow) box.scrollTop = Math.max(0, todayRow.offsetTop - box.clientHeight / 2);
 }
 
+// ---------- Календарь ----------
+
+// Группы для цветных точек: цвет — подсказка, название группы есть в легенде и в списке дня
+const CAL_GROUPS = [
+  { name: "Еда", color: "#0f4f54", cats: ["products", "vegetables", "convenience", "cafe", "nuts"] },
+  { name: "Дорога", color: "#b07d2b", cats: ["transport"] },
+  { name: "Отдаю", color: "#a3412f", cats: ["charity", "gift", "ten_percent"] },
+  { name: "Быт и одежда", color: "#6f8f86", cats: ["household", "laundry", "housing", "clothes"] },
+  { name: "Развитие", color: "#3d6fa3", cats: ["books", "sport"] },
+  { name: "Другое", color: "#9aa8a3", cats: ["other"] },
+];
+const CAL_COLOR = Object.fromEntries(CAL_GROUPS.flatMap((g) => g.cats.map((c) => [c, g.color])));
+
+function renderCalendar(rows) {
+  const box = $("view-calendar");
+  box.replaceChildren();
+  const [y, m] = state.month.split("-").map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const today = todayISO();
+  const iso = (d) => `${state.month}-${String(d).padStart(2, "0")}`;
+
+  const byDay = new Map();
+  for (const row of rows) {
+    if (!byDay.has(row.date)) byDay.set(row.date, []);
+    byDay.get(row.date).push(row);
+  }
+  const spentOn = (day) => (byDay.get(day) || []).filter((r) => r.kind === "expense").reduce((s, r) => s + r.amount, 0);
+  const totals = [...byDay.keys()].map(spentOn);
+  const max = Math.max(1, ...totals);
+  const avg = totals.length ? totals.reduce((a, b) => a + b, 0) / totals.length : 0;
+
+  // Выбранный день: тот, что выбрали раньше в этом месяце, иначе сегодня, иначе последний день с записями
+  if (!state.calDay || !state.calDay.startsWith(state.month)) {
+    state.calDay = today.startsWith(state.month) ? today : ([...byDay.keys()].sort().pop() || iso(1));
+  }
+
+  const grid = el("div", { class: "cal", role: "grid", "aria-label": "Календарь расходов" });
+  ["пн", "вт", "ср", "чт", "пт", "сб", "вс"].forEach((w, i) => grid.append(el("div", { class: `cal-wh${i >= 5 ? " we" : ""}` }, w)));
+  const offset = (new Date(y, m - 1, 1).getDay() + 6) % 7;
+  for (let i = 0; i < offset; i++) grid.append(el("div", { class: "cal-d blank" }));
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const day = iso(d);
+    const weekday = (offset + d - 1) % 7;
+    const items = byDay.get(day) || [];
+    const spent = spentOn(day);
+    const future = day > today;
+    const groups = CAL_GROUPS.filter((g) => items.some((r) => r.kind === "expense" && g.cats.includes(r.category)));
+    const extra = items.filter((r) => r.kind !== "expense");
+    const cls = ["cal-d", weekday >= 5 && "we", future && "future", day === today && "today", day === state.calDay && "sel"];
+    const label = new Date(day + "T00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long", weekday: "long" });
+    const cell = el("button", {
+      type: "button", class: cls.filter(Boolean).join(" "),
+      "aria-label": `${label}: ${spent ? money(spent) : "нет расходов"}`,
+      "aria-pressed": day === state.calDay ? "true" : "false",
+      style: spent ? `--h:${(0.04 + (spent / max) * 0.2).toFixed(3)}` : null,
+      onclick: () => { state.calDay = day; renderCalendar(state.rows); },
+    },
+      el("span", { class: "cal-n" }, d),
+      spent >= Math.max(15000, avg * 2.5) && totals.length > 3 ? el("span", { class: "cal-big" }, "крупная") : null,
+      el("span", { class: "cal-t" }, spent ? fmt(spent) : (items.length ? "" : future ? "" : "—")),
+      el("span", { class: "cal-dots" },
+        ...groups.map((g) => el("i", { style: `background:${g.color}`, title: g.name })),
+        extra.length ? el("i", { class: "ring", title: "Доход или долг" }) : null),
+    );
+    grid.append(cell);
+  }
+  const tail = (7 - ((offset + daysInMonth) % 7)) % 7;
+  for (let i = 0; i < tail; i++) grid.append(el("div", { class: "cal-d blank" }));
+
+  // Итоги по неделям (пн–вс внутри месяца)
+  const weeks = [];
+  let start = 1;
+  for (let d = 1; d <= daysInMonth; d++) {
+    if ((offset + d - 1) % 7 === 6 || d === daysInMonth) {
+      const sum = Array.from({ length: d - start + 1 }, (_, i) => spentOn(iso(start + i))).reduce((a, b) => a + b, 0);
+      if (iso(start) <= today) weeks.push({ from: start, to: d, sum });
+      start = d + 1;
+    }
+  }
+  const monthName = new Date(y, m - 1, 1).toLocaleDateString("ru-RU", { month: "long", day: "numeric" }).split(" ")[1];
+  const weekBox = el("div", { class: "cal-weeks" }, ...weeks.map((w) =>
+    el("div", {}, w.from === w.to ? `${w.from} ${monthName}` : `${w.from}–${w.to} ${monthName}`, el("b", {}, w.sum ? money(w.sum) : "—"))));
+
+  const legend = el("div", { class: "cal-legend" }, ...CAL_GROUPS.slice(0, 5).map((g) =>
+    el("span", {}, el("i", { style: `background:${g.color}` }), g.name)),
+    el("span", {}, el("i", { class: "ring" }), "доход или долг"));
+
+  box.append(grid, el("div", { class: "cal-below" },
+    renderCalendarDay(byDay.get(state.calDay) || []),
+    el("div", { class: "cal-aside" }, legend, weekBox)));
+}
+
+function renderCalendarDay(items) {
+  const day = state.calDay;
+  const label = new Date(day + "T00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long", weekday: "long" });
+  const spent = items.filter((r) => r.kind === "expense").reduce((s, r) => s + r.amount, 0);
+  const count = items.length;
+  const word = count % 10 === 1 && count % 100 !== 11 ? "запись"
+    : [2, 3, 4].includes(count % 10) && ![12, 13, 14].includes(count % 100) ? "записи" : "записей";
+  const panel = el("aside", { class: "cal-day", "aria-live": "polite" },
+    el("h3", {}, label),
+    el("p", { class: "cal-sub" }, count ? `${count} ${word}` : "Записей нет"),
+    spent ? el("p", { class: "cal-total" }, money(spent)) : null,
+  );
+  for (const row of items) {
+    const sign = row.kind === "income" || row.kind === "repaid" ? "+" : row.kind === "lend" ? "→ " : "";
+    panel.append(el("button", { type: "button", class: "cal-it", title: "Изменить запись", onclick: () => openEditor(label, [row]) },
+      el("i", { style: `background:${CAL_COLOR[row.category] || "#c9d3cc"}` }),
+      el("span", {}, row.counterparty || row.description || state.names[row.category],
+        el("small", {}, state.names[row.category] || row.category)),
+      el("b", { class: row.kind }, sign + money(row.amount)),
+    ));
+  }
+  panel.append(el("button", { type: "button", class: "link-btn cal-add", onclick: () => {
+    $("date").value = day;
+    $("text").focus();
+    $("text").scrollIntoView({ behavior: "smooth", block: "center" });
+  } }, "+ Добавить запись на этот день"));
+  return panel;
+}
+
 // ---------- Список ----------
 
 function renderList(rows) {
@@ -709,10 +831,10 @@ function renderEditor() {
 function setView(view) {
   state.view = view;
   storage.set("view", view);
-  $("tab-table").setAttribute("aria-selected", view === "table");
-  $("tab-list").setAttribute("aria-selected", view === "list");
-  $("view-table").hidden = view !== "table";
-  $("view-list").hidden = view !== "list";
+  for (const name of ["table", "calendar", "list"]) {
+    $(`tab-${name}`).setAttribute("aria-selected", view === name);
+    $(`view-${name}`).hidden = view !== name;
+  }
 }
 
 async function refresh() {
@@ -729,13 +851,23 @@ async function refresh() {
     state.rows = rows;
     renderSummary(summary);
     renderTable(rows);
+    renderCalendar(rows);
     renderList(rows);
   } catch (error) {
     setStatus(error.message, true);
   }
 }
 
-// ---------- Загрузка CSV ----------
+// ---------- Загрузка из Excel (или CSV) ----------
+
+function toBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",", 2)[1] || "");
+    reader.onerror = () => reject(new Error("Не получилось прочитать файл"));
+    reader.readAsDataURL(file);
+  });
+}
 
 async function importFile(event) {
   const file = event.target.files[0];
@@ -743,8 +875,14 @@ async function importFile(event) {
   if (!file) return;
   setStatus(`Загружаю ${file.name}…`);
   try {
-    const text = await file.text();
-    const result = await api("/api/import", { method: "POST", body: JSON.stringify({ csv: text }) });
+    let body;
+    if (/\.csv$/i.test(file.name)) {
+      body = { csv: await file.text() };
+    } else {
+      if (file.size > 5 * 1024 * 1024) throw new Error("Файл больше 5 МБ — разбейте его на части");
+      body = { xlsx: await toBase64(file) };
+    }
+    const result = await api("/api/import", { method: "POST", body: JSON.stringify(body) });
     setStatus(`Загружено записей: ${result.imported}`);
     const month = result.months[result.months.length - 1];
     if (month && month !== state.month) setMonth(month);
@@ -1005,6 +1143,7 @@ async function init() {
   $("next-month").addEventListener("click", () => setMonth(shiftMonth(state.month, 1)));
   $("tab-table").addEventListener("click", () => setView("table"));
   $("tab-list").addEventListener("click", () => setView("list"));
+  $("tab-calendar").addEventListener("click", () => setView("calendar"));
   const grow = () => {
     const t = $("text");
     t.style.height = "auto";
@@ -1026,7 +1165,7 @@ async function init() {
       if (state.summary) renderDailyChart(state.summary);
     }, 150);
   });
-  setView(storage.get("view") === "list" ? "list" : "table");
+  setView(["list", "calendar"].includes(storage.get("view")) ? storage.get("view") : "table");
 
   $("auth-form").addEventListener("submit", submitAuth);
   $("auth-switch").addEventListener("click", () => setAuthMode(state.authMode === "login" ? "register" : "login"));
