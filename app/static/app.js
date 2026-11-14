@@ -1041,7 +1041,6 @@ function renderEditor() {
 
 function setView(view) {
   state.view = view;
-  storage.set("view", view);
   for (const name of ["table", "calendar", "list"]) {
     $(`tab-${name}`).setAttribute("aria-selected", view === name);
     $(`view-${name}`).hidden = view !== name;
@@ -1450,9 +1449,7 @@ async function init() {
       if (state.summary) renderDailyChart(state.summary);
     }, 150);
   });
-  const savedView = storage.get("view");
-  const defaultView = matchMedia("(max-width: 720px)").matches ? "calendar" : "table";
-  setView(["table", "list", "calendar"].includes(savedView) ? savedView : defaultView);
+  setView("calendar"); // при каждом входе сначала календарь — и на телефоне, и на компьютере
 
   $("auth-form").addEventListener("submit", submitAuth);
   $("auth-demo").addEventListener("click", async () => {
