@@ -55,15 +55,7 @@
 
 ## Как устроено
 
-```mermaid
-flowchart LR
-    U["Браузер<br/>HTML, CSS, JS · PWA"] -- "JSON, JWT в httpOnly cookie" --> API["FastAPI<br/>Pydantic · SQLAlchemy"]
-    API -- "текст → JSON с записями" --> LLM["LLM через Groq<br/>OpenAI-совместимый API"]
-    API -. "ИИ недоступен" .-> R["Запасной разбор<br/>регулярные выражения"]
-    API --> DB[("PostgreSQL · Neon<br/>миграции Alembic")]
-    GH["GitHub"] -- "push" --> CI["GitHub Actions<br/>pytest на SQLite и PostgreSQL,<br/>сборка Docker"]
-    GH -- "автодеплой" --> RENDER["Render<br/>Docker-контейнер"]
-```
+<img src="docs/architecture.png" alt="Схема: браузер → FastAPI → LLM и PostgreSQL; GitHub Actions и автодеплой на Render" width="860">
 
 1. Текст уходит на `POST /api/parse`. Модель возвращает JSON со списком операций, ответ проверяется Pydantic: неизвестная категория становится «Другое», запись без суммы отбрасывается, тип операции всегда следует из категории.
 2. К результату применяются привычки пользователя — последние исправленные категории для тех же описаний.
