@@ -39,20 +39,35 @@ def verify_password(password: str, stored: str) -> bool:
     return hmac.compare_digest(actual, expected)
 
 
-def create_token(user_id: int, days: int | None = None) -> str:
+def password_stamp(password_hash: str) -> str:
+    """Короткий отпечаток хеша пароля. Он кладётся в токен: после смены пароля
+    отпечаток меняется, и все старые токены (другие устройства) перестают работать."""
+    import hashlib
+
+    return hashlib.sha256(password_hash.encode()).hexdigest()[:16]
+
+
+def create_token(user_id: int, days: int | None = None, stamp: str = "") -> str:
     now = datetime.now(timezone.utc)
     payload = {
         "sub": str(user_id),
+        "pwd": stamp,
         "iat": now,
         "exp": now + timedelta(days=days if days is not None else settings.token_days),
     }
     return jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
 
 
-def read_token(token: str) -> int | None:
-    """Возвращает id пользователя или None, если токен неверный или истёк."""
+def read_claims(token: str) -> tuple[int, str] | None:
+    """(id пользователя, отпечаток пароля) или None, если токен неверный или истёк."""
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
-        return int(payload["sub"])
+        return int(payload["sub"]), str(payload.get("pwd", ""))
     except (jwt.PyJWTError, KeyError, ValueError):
         return None
+
+
+def read_token(token: str) -> int | None:
+    """Возвращает id пользователя или None, если токен неверный или истёк."""
+    claims = read_claims(token)
+    return claims[0] if claims else None

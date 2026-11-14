@@ -27,3 +27,11 @@ def test_expired_and_forged_tokens():
     assert read_token("not-a-token") is None
     token = create_token(42)
     assert read_token(token[:-2] + ("aa" if not token.endswith("aa") else "bb")) is None
+
+
+def test_token_carries_password_stamp():
+    from app.security import password_stamp, read_claims
+
+    stamp = password_stamp(hash_password("password123"))
+    assert read_claims(create_token(7, stamp=stamp)) == (7, stamp)
+    assert password_stamp("hash-a") != password_stamp("hash-b")

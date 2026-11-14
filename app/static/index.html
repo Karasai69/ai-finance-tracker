@@ -32,6 +32,7 @@
         <div class="account" id="account" hidden>
           <button type="button" id="install" class="logout install">Установить приложение</button>
           <span id="user-email" class="serial"></span>
+          <button type="button" id="open-account" class="logout">Аккаунт</button>
           <button type="button" id="logout" class="logout">Выйти</button>
         </div>
       </div>
@@ -193,6 +194,43 @@
         <li>Выберите «Установить приложение» или «Добавить на главный экран».</li>
       </ol>
     </div>
+  </dialog>
+
+  <dialog id="account-dialog" class="editor" aria-labelledby="account-title">
+    <div class="editor-head">
+      <h2 id="account-title">Аккаунт</h2>
+      <button type="button" id="account-close" class="icon-btn" aria-label="Закрыть">×</button>
+    </div>
+
+    <p class="account-email">Вы вошли как <strong id="account-email"></strong></p>
+
+    <form id="password-form" class="account-section" novalidate>
+      <h3>Сменить пароль</h3>
+      <p class="account-lead">На других устройствах нужно будет войти заново.</p>
+      <label for="pw-current">Текущий пароль</label>
+      <input id="pw-current" type="password" autocomplete="current-password" required>
+      <label for="pw-new">Новый пароль</label>
+      <input id="pw-new" type="password" autocomplete="new-password" minlength="8" required>
+      <label for="pw-repeat">Повторите новый пароль</label>
+      <input id="pw-repeat" type="password" autocomplete="new-password" minlength="8" required>
+      <div class="editor-actions">
+        <span id="pw-note" class="editor-note" role="status"></span>
+        <button type="submit" id="pw-submit" class="btn primary">Сменить пароль</button>
+      </div>
+    </form>
+
+    <form id="delete-form" class="account-section danger-zone" novalidate>
+      <h3>Удалить аккаунт</h3>
+      <p class="account-lead">Все записи, долги и лимиты будут удалены навсегда, восстановить их нельзя.
+        Сначала можно <a href="/api/export.csv" download>скачать все записи в CSV</a>.</p>
+      <label for="del-password">Пароль</label>
+      <input id="del-password" type="password" autocomplete="current-password" required>
+      <label class="check"><input id="del-confirm" type="checkbox"> Понимаю, что данные удалятся без возможности восстановления</label>
+      <div class="editor-actions">
+        <span id="del-note" class="editor-note" role="status"></span>
+        <button type="submit" id="del-submit" class="btn ghost danger" disabled>Удалить аккаунт</button>
+      </div>
+    </form>
   </dialog>
 
   <script src="/static/app.js"></script>

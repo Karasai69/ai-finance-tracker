@@ -251,3 +251,49 @@ def test_pwa_files(make_client):
     for icon in manifest.json()["icons"]:
         assert c.get(icon["src"]).status_code == 200
     assert c.get("/favicon.ico").status_code == 200
+
+
+# ---------- Смена пароля и удаление аккаунта ----------
+
+def test_change_password_logs_out_other_devices(make_client):
+    laptop, phone = make_client(), make_client()
+    laptop.post("/api/auth/register", json={"email": "a@b.kz", "password": "password123"})
+    phone.post("/api/auth/login", json={"email": "a@b.kz", "password": "password123"})
+
+    bad = laptop.post("/api/auth/password", json={"current_password": "wrongpass1", "new_password": "newpass123"})
+    assert bad.status_code == 403
+    same = laptop.post("/api/auth/password", json={"current_password": "password123", "new_password": "password123"})
+    assert same.status_code == 400
+    short = laptop.post("/api/auth/password", json={"current_password": "password123", "new_password": "short"})
+    assert short.status_code == 422
+
+    ok = laptop.post("/api/auth/password", json={"current_password": "password123", "new_password": "newpass123"})
+    assert ok.status_code == 200
+    assert laptop.get("/api/auth/me").status_code == 200  # это устройство остаётся в аккаунте
+    assert phone.get("/api/auth/me").status_code == 401  # старый токен больше не действует
+
+    fresh = make_client()
+    assert fresh.post("/api/auth/login", json={"email": "a@b.kz", "password": "password123"}).status_code == 401
+    assert fresh.post("/api/auth/login", json={"email": "a@b.kz", "password": "newpass123"}).status_code == 200
+
+
+def test_delete_account_removes_all_data(make_client):
+    alice, bob = make_client(), make_client()
+    alice.post("/api/auth/register", json={"email": "alice@kz.kz", "password": "password123"})
+    bob.post("/api/auth/register", json={"email": "bob@kz.kz", "password": "password123"})
+    item = {"date": "2026-11-10", "amount": 300, "category": "transport", "description": "такси"}
+    alice.post("/api/transactions", json={"items": [item]})
+    bob.post("/api/transactions", json={"items": [item]})
+    assert alice.put("/api/budgets/transport", json={"limit": 5000}).status_code == 200
+
+    wrong = alice.request("DELETE", "/api/auth/account", json={"password": "wrongpass1"})
+    assert wrong.status_code == 403
+    assert alice.request("DELETE", "/api/auth/account", json={"password": "password123"}).status_code == 204
+
+    assert alice.get("/api/auth/me").status_code == 401
+    again = make_client()
+    assert again.post("/api/auth/login", json={"email": "alice@kz.kz", "password": "password123"}).status_code == 401
+    # Email снова свободен, а старые записи не «воскресают»
+    assert again.post("/api/auth/register", json={"email": "alice@kz.kz", "password": "password123"}).status_code == 201
+    assert again.get("/api/transactions", params={"month": "2026-11"}).json() == []
+    assert len(bob.get("/api/transactions", params={"month": "2026-11"}).json()) == 1  # чужие данные не тронуты

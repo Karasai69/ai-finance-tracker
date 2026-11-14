@@ -340,7 +340,7 @@ input, select, textarea { border-radius: 2px; }
   .note-inner { padding: 16px 16px 22px; }
   .note-top { flex-wrap: wrap; row-gap: 10px; }
   .month { order: 3; width: 100%; justify-content: space-between; }
-  .serial { max-width: 150px; font-size: 13px; }
+  .serial { display: none; } /* email виден в окне «Аккаунт» */
   .account { gap: 10px; }
   .install { font-size: 13px; }
   .hero { max-width: none; margin-top: 16px; }
@@ -369,3 +369,18 @@ input, select, textarea { border-radius: 2px; }
 @media (prefers-reduced-motion: no-preference) {
   .bar-fill { transition: width .4s ease-out; }
 }
+
+/* ---------- Аккаунт ---------- */
+.account-section { padding: 16px 20px 18px; }
+.account-email { margin: 0; padding: 14px 20px 0; color: var(--muted); font-size: 14px; }
+.account-email strong { color: var(--ink); }
+.account-section + .account-section { border-top: 1px solid var(--rule); }
+.account-section h3 { margin: 0 0 4px; font-size: 16px; }
+.account-lead { margin: 0 0 6px; color: var(--muted); font-size: 14px; line-height: 1.45; }
+.account-lead a { color: var(--teal); }
+.account-section label { display: block; font-size: 14px; font-weight: 500; margin: 12px 0 6px; }
+.account-section input[type="password"] { width: 100%; }
+.account-section label.check { display: flex; gap: 8px; align-items: flex-start; font-weight: 400; line-height: 1.4; }
+.account-section label.check input { margin-top: 3px; }
+.editor-note.ok { color: var(--teal); }
+.danger-zone h3 { color: var(--brick); }

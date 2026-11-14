@@ -864,6 +864,69 @@ async function logout() {
   showAuth();
 }
 
+// ---------- Аккаунт: смена пароля и удаление ----------
+
+function openAccount() {
+  for (const id of ["pw-current", "pw-new", "pw-repeat", "del-password"]) $(id).value = "";
+  $("account-email").textContent = state.user?.email || "";
+  $("del-confirm").checked = false;
+  $("del-submit").disabled = true;
+  for (const id of ["pw-note", "del-note"]) {
+    $(id).textContent = "";
+    $(id).classList.remove("ok");
+  }
+  $("account-dialog").showModal();
+}
+
+async function changePassword(event) {
+  event.preventDefault();
+  const note = $("pw-note");
+  note.classList.remove("ok");
+  const current = $("pw-current").value;
+  const fresh = $("pw-new").value;
+  if (!current || !fresh) return (note.textContent = "Заполните все поля");
+  if (fresh.length < 8) return (note.textContent = "Новый пароль — не короче 8 символов");
+  if (fresh !== $("pw-repeat").value) return (note.textContent = "Пароли не совпадают");
+  $("pw-submit").disabled = true;
+  note.textContent = "";
+  try {
+    await api("/api/auth/password", {
+      method: "POST",
+      body: JSON.stringify({ current_password: current, new_password: fresh }),
+    });
+    for (const id of ["pw-current", "pw-new", "pw-repeat"]) $(id).value = "";
+    note.textContent = "Пароль изменён";
+    note.classList.add("ok");
+  } catch (error) {
+    note.textContent = error.message;
+  } finally {
+    $("pw-submit").disabled = false;
+  }
+}
+
+async function deleteAccount(event) {
+  event.preventDefault();
+  const note = $("del-note");
+  const password = $("del-password").value;
+  if (!password) return (note.textContent = "Введите пароль");
+  if (!$("del-confirm").checked) return (note.textContent = "Поставьте галочку подтверждения");
+  $("del-submit").disabled = true;
+  note.textContent = "";
+  try {
+    await api("/api/auth/account", { method: "DELETE", body: JSON.stringify({ password }) });
+    $("account-dialog").close();
+    state.rows = [];
+    state.preview = [];
+    renderPreview();
+    setAuthMode("register");
+    showAuth();
+    $("auth-error").textContent = "Аккаунт удалён";
+  } catch (error) {
+    note.textContent = error.message;
+    $("del-submit").disabled = !$("del-confirm").checked;
+  }
+}
+
 // ---------- Узор купюры ----------
 
 // Гильош — переплетение синусоид, как на банкнотах. Рисуется под ширину шапки.
@@ -968,6 +1031,11 @@ async function init() {
   $("auth-form").addEventListener("submit", submitAuth);
   $("auth-switch").addEventListener("click", () => setAuthMode(state.authMode === "login" ? "register" : "login"));
   $("logout").addEventListener("click", logout);
+  $("open-account").addEventListener("click", openAccount);
+  $("account-close").addEventListener("click", () => $("account-dialog").close());
+  $("password-form").addEventListener("submit", changePassword);
+  $("delete-form").addEventListener("submit", deleteAccount);
+  $("del-confirm").addEventListener("change", (e) => ($("del-submit").disabled = !e.target.checked));
   $("import").addEventListener("click", () => $("import-file").click());
   $("editor-close").addEventListener("click", () => $("editor").close());
   $("open-limits").addEventListener("click", () => openLimits().catch((e) => setStatus(e.message, true)));

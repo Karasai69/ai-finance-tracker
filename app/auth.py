@@ -6,15 +6,15 @@
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.models import User
+from app.models import Budget, Transaction, User
 from app.ratelimit import login_limiter, register_limiter
-from app.schemas import AuthResponse, Credentials, UserOut
-from app.security import create_token, hash_password, read_token, verify_password
+from app.schemas import AccountDelete, AuthResponse, Credentials, PasswordChange, UserOut
+from app.security import create_token, hash_password, password_stamp, read_claims, verify_password
 
 COOKIE_NAME = "access_token"
 
@@ -30,6 +30,12 @@ def _set_cookie(response: Response, token: str) -> None:
         samesite="lax",
         secure=settings.cookie_secure,
     )
+
+
+def _issue(response: Response, user: User) -> str:
+    token = create_token(user.id, stamp=password_stamp(user.password_hash))
+    _set_cookie(response, token)
+    return token
 
 
 def _client_ip(request: Request) -> str:
@@ -52,9 +58,10 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     if not token:
         token = request.cookies.get(COOKIE_NAME)
 
-    user_id = read_token(token) if token else None
-    user = db.get(User, user_id) if user_id else None
-    if user is None:
+    claims = read_claims(token) if token else None
+    user = db.get(User, claims[0]) if claims else None
+    # Токен, выданный до смены пароля, больше не действует
+    if user is None or claims[1] != password_stamp(user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Нужно войти в аккаунт")
     return user
 
@@ -71,8 +78,7 @@ def register(body: Credentials, request: Request, response: Response, db: Sessio
     db.add(user)
     db.commit()
     db.refresh(user)
-    token = create_token(user.id)
-    _set_cookie(response, token)
+    token = _issue(response, user)
     return AuthResponse(user=UserOut.model_validate(user), access_token=token)
 
 
@@ -88,8 +94,7 @@ def login(body: Credentials, request: Request, response: Response, db: Session =
         login_limiter.hit(key)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Неверный email или пароль")
     login_limiter.reset(key)
-    token = create_token(user.id)
-    _set_cookie(response, token)
+    token = _issue(response, user)
     return AuthResponse(user=UserOut.model_validate(user), access_token=token)
 
 
@@ -103,3 +108,51 @@ def logout():
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(get_current_user)):
     return user
+
+
+def _check_password(user: User, password: str, request: Request) -> None:
+    """Проверка текущего пароля перед опасными действиями — с тем же лимитом попыток, что и вход."""
+    key = f"{_client_ip(request)}|{user.email}"
+    if login_limiter.is_blocked(key):
+        minutes = max(1, login_limiter.retry_after(key) // 60)
+        raise _too_many(login_limiter, key, f"Слишком много попыток. Попробуйте через {minutes} мин.")
+    if not verify_password(password, user.password_hash):
+        login_limiter.hit(key)
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Неверный текущий пароль")
+    login_limiter.reset(key)
+
+
+@router.post("/password", response_model=AuthResponse)
+def change_password(
+    body: PasswordChange,
+    request: Request,
+    response: Response,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Смена пароля. Остальные устройства выходят из аккаунта, это — остаётся."""
+    _check_password(user, body.current_password, request)
+    if body.new_password == body.current_password:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Новый пароль совпадает с текущим")
+    user.password_hash = hash_password(body.new_password)
+    db.commit()
+    token = _issue(response, user)
+    return AuthResponse(user=UserOut.model_validate(user), access_token=token)
+
+
+@router.delete("/account", status_code=204)
+def delete_account(
+    body: AccountDelete,
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Удаляет аккаунт и все его данные без возможности восстановления."""
+    _check_password(user, body.password, request)
+    db.execute(delete(Transaction).where(Transaction.user_id == user.id))
+    db.execute(delete(Budget).where(Budget.user_id == user.id))
+    db.delete(user)
+    db.commit()
+    response = Response(status_code=204)
+    response.delete_cookie(COOKIE_NAME, samesite="lax", secure=settings.cookie_secure)
+    return response
