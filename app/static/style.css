@@ -766,3 +766,5 @@ body[data-screen="debts"] .debts-total { font-size: 26px; }
 .btn.danger-fill { background: var(--brick); border-color: var(--brick); color: #fff; }
 .btn.danger-fill:hover { background: #962f22; }
 .debt-closed-item .debt-remove { margin-left: 8px; font-size: 12.5px; }
+
+.row-confirm { margin-top: 10px; }

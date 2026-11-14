@@ -1010,22 +1010,38 @@ function renderEditor() {
     personField.hidden = !isPersonKind(row.category);
     const note = el("span", { class: "editor-note", role: "status" });
     const remove = el("button", { type: "button", class: "btn ghost danger" }, "Удалить");
-    remove.addEventListener("click", async () => {
-      if (remove.dataset.armed !== "1") {
-        remove.dataset.armed = "1";
-        remove.textContent = "Точно удалить?";
-        return;
-      }
+    // Подтверждение прямо под записью: понятный вопрос и две кнопки «Да» / «Нет»
+    const yes = el("button", { type: "button", class: "btn danger-fill" }, "Да, удалить");
+    const no = el("button", { type: "button", class: "btn ghost" }, "Нет");
+    const what = [row.description || state.names[row.category], money(row.amount)].filter(Boolean).join(", ");
+    const ask = el("div", { class: "debt-confirm row-confirm", hidden: "" },
+      el("p", {}, `Удалить запись «${what}»? Отменить это нельзя.`),
+      el("div", { class: "debt-confirm-actions" }, yes, no));
+    remove.addEventListener("click", () => {
+      ask.hidden = false;
+      actions.hidden = true;
+      yes.focus();
+    });
+    no.addEventListener("click", () => {
+      ask.hidden = true;
+      actions.hidden = false;
+    });
+    yes.addEventListener("click", async () => {
+      yes.disabled = true;
       try {
         await api(`/api/transactions/${row.id}`, { method: "DELETE" });
         setStatus("Запись удалена");
         await refresh();
         renderEditor();
       } catch (error) {
+        ask.hidden = true;
+        actions.hidden = false;
+        yes.disabled = false;
         note.textContent = error.message;
       }
     });
     const save = el("button", { type: "button", class: "btn primary" }, "Сохранить");
+    const actions = el("div", { class: "editor-actions" }, note, remove, save);
     save.addEventListener("click", async () => {
       if (!(draft.amount > 0)) return (note.textContent = "Сумма должна быть больше нуля");
       save.disabled = true;
@@ -1053,7 +1069,8 @@ function renderEditor() {
           onchange: (e) => (draft.description = e.target.value) })),
         personField,
       ),
-      el("div", { class: "editor-actions" }, note, remove, save),
+      actions,
+      ask,
     ));
   }
 }
