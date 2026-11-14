@@ -1020,21 +1020,64 @@ function renderEditor() {
   }
 }
 
+// ---------- Экраны и кнопка «Назад» ----------
+// У каждого экрана свой адрес (#calendar, #table, #stats, #debts) в истории браузера:
+// кнопка или жест «назад» возвращает на прошлый экран, а не уводит с сайта.
+const SCREEN_HASH = { home: "#calendar", table: "#table", stats: "#stats", debts: "#debts" };
+const screenFromHash = () => Object.keys(SCREEN_HASH).find((k) => SCREEN_HASH[k] === location.hash) || null;
+
 function setView(view) {
-  state.view = view;
-  for (const name of ["table", "calendar"]) $(`view-${name}`).hidden = view !== name;
   setScreen(view === "table" ? "table" : "home");
 }
 
 // На телефоне каждая вкладка внизу — отдельный экран (на компьютере всё на одной странице)
 const isPhone = () => matchMedia("(max-width: 720px)").matches;
 
-function setScreen(screen) {
+let screenSteps = 0; // сколько раз мы сами шагнули вперёд по экранам — столько можно вернуться назад
+let closingDialog = false;
+
+function setScreen(screen, history = "push") {
+  const changed = document.body.dataset.screen !== screen;
+  const view = screen === "table" ? "table" : "calendar";
+  if (screen === "home" || screen === "table") {
+    state.view = view;
+    for (const name of ["table", "calendar"]) $(`view-${name}`).hidden = view !== name;
+  }
   document.body.dataset.screen = screen;
   const tabs = { "tab-calendar": "home", "tab-table": "table", "nav-review": "stats", "nav-debts": "debts" };
   for (const [id, name] of Object.entries(tabs)) $(id).setAttribute("aria-selected", screen === name ? "true" : "false");
-  window.scrollTo({ top: 0, behavior: "instant" });
+  const hash = SCREEN_HASH[screen];
+  if (history === "push" && location.hash !== hash) {
+    window.history.pushState({ screen }, "", hash);
+    screenSteps += 1;
+  }
+  if (history === "replace") window.history.replaceState({ screen }, "", hash);
+  if (changed) window.scrollTo({ top: 0, behavior: "instant" });
 }
+
+function goBack() {
+  // Если до этого был наш экран — шаг назад по истории, иначе просто на главную
+  if (screenSteps > 0) window.history.back();
+  else setScreen("home", "replace");
+}
+
+window.addEventListener("popstate", () => {
+  if (closingDialog) { closingDialog = false; return; } // это мы сами убрали запись открытого окна
+  const open = document.querySelector("dialog[open]");
+  if (open) { open.close(); return; } // «назад» сначала закрывает открытое окно
+  screenSteps = Math.max(0, screenSteps - 1);
+  setScreen(screenFromHash() || "home", "none");
+});
+
+// Окна (редактирование, аккаунт, лимиты) тоже закрываются кнопкой «назад»
+const showModalOriginal = HTMLDialogElement.prototype.showModal;
+HTMLDialogElement.prototype.showModal = function () {
+  window.history.pushState({ screen: document.body.dataset.screen, dialog: true }, "", location.hash);
+  this.addEventListener("close", () => {
+    if (window.history.state?.dialog) { closingDialog = true; window.history.back(); }
+  }, { once: true });
+  return showModalOriginal.call(this);
+};
 
 async function refresh() {
   const month = state.month;
@@ -1392,6 +1435,7 @@ async function init() {
   $("next-month").addEventListener("click", () => setMonth(shiftMonth(state.month, 1)));
   $("tab-table").addEventListener("click", () => setView("table"));
   $("tab-calendar").addEventListener("click", () => setView("calendar"));
+  $("back").addEventListener("click", goBack);
   const goTo = (node) => node.scrollIntoView({ behavior: "smooth", block: "start" });
   $("nav-review").addEventListener("click", () => setScreen("stats"));
   $("fab").addEventListener("click", () => {
@@ -1424,7 +1468,8 @@ async function init() {
       if (state.summary) renderDailyChart(state.summary);
     }, 150);
   });
-  setView("calendar"); // при каждом входе сначала календарь — и на телефоне, и на компьютере
+  // При входе — календарь; если в адресе уже есть экран (обновили страницу) — он
+  setScreen(screenFromHash() || "home", "replace");
 
   $("auth-form").addEventListener("submit", submitAuth);
   $("auth-demo").addEventListener("click", async () => {

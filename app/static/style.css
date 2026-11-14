@@ -742,3 +742,15 @@ body[data-screen="debts"] .debts-total { font-size: 26px; }
   body[data-screen="stats"] .layout { grid-template-columns: minmax(0, 1fr); max-width: 980px; }
   body[data-screen="stats"] .bars { display: grid; grid-template-columns: 1fr 1fr; column-gap: 44px; align-items: start; }
 }
+
+/* Кнопка «Назад»: на телефоне вне главного экрана (на компьютере меню всегда на виду) */
+.back-btn { display: none; }
+@media (max-width: 720px) {
+  body:not([data-screen="home"]) .back-btn {
+    display: inline-flex; align-items: center; justify-self: start; gap: 4px;
+    padding: 4px 12px 4px 8px; border-radius: 16px; border: 1px solid rgba(246, 236, 225, .3);
+    background: transparent; color: var(--note-text); font: 500 14px var(--body); cursor: pointer;
+  }
+  body:not([data-screen="home"]) .back-btn:active { background: rgba(246, 236, 225, .12); }
+  body:not([data-screen="home"]) .rail-top { gap: 8px; }
+}
