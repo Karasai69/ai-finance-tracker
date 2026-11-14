@@ -362,3 +362,41 @@ def test_demo_seed_without_api():
     kinds = {r.kind for r in rows}
     assert {"expense", "income", "lend", "repaid"} <= kinds
     assert all(r.amount > 0 for r in rows)
+
+
+def test_transcribe_voice(make_client, monkeypatch):
+    from app import main
+    from app.config import settings
+    from app.parser.speech import SpeechError
+
+    c = make_client()
+    assert c.post("/api/transcribe", content=b"x", headers={"content-type": "audio/webm"}).status_code == 401
+    c.post("/api/auth/register", json={"email": "v@kz.kz", "password": "password123"})
+
+    monkeypatch.setattr(settings, "ai_api_key", None)
+    assert c.post("/api/transcribe", content=b"x", headers={"content-type": "audio/webm"}).status_code == 503
+
+    monkeypatch.setattr(settings, "ai_api_key", "key")
+    monkeypatch.setattr(settings, "stt_model", "whisper-large-v3")
+    seen = {}
+
+    def fake(audio, content_type):
+        seen["args"] = (audio, content_type)
+        return "такси 1 200, самса 500"
+
+    monkeypatch.setattr(main, "transcribe", fake)
+    r = c.post("/api/transcribe", content=b"audio-bytes", headers={"content-type": "audio/webm;codecs=opus"})
+    assert r.status_code == 200 and r.json() == {"text": "такси 1 200, самса 500"}
+    assert seen["args"] == (b"audio-bytes", "audio/webm;codecs=opus")
+
+    assert c.post("/api/transcribe", content=b"x", headers={"content-type": "text/plain"}).status_code == 415
+    assert c.post("/api/transcribe", content=b"", headers={"content-type": "audio/webm"}).status_code == 422
+    big = b"0" * (5 * 1024 * 1024 + 1)
+    assert c.post("/api/transcribe", content=big, headers={"content-type": "audio/webm"}).status_code == 413
+
+    def broken(audio, content_type):
+        raise SpeechError("Не расслышал — попробуйте сказать ещё раз чуть громче")
+
+    monkeypatch.setattr(main, "transcribe", broken)
+    r = c.post("/api/transcribe", content=b"x", headers={"content-type": "audio/webm"})
+    assert r.status_code == 502 and "Не расслышал" in r.json()["detail"]

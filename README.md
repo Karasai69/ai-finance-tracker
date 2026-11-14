@@ -27,7 +27,7 @@ Since early 2026 I logged every expense by hand in Google Sheets: date, category
 ## Features
 
 **Input**
-- Free text or voice — the LLM extracts amounts, categories, dates ("yesterday"), income and debts
+- Free text or voice (Whisper speech-to-text on the server) — the LLM extracts amounts, categories, dates ("yesterday"), income and debts
 - Preview before saving: category, amount and date can be corrected
 - Learns from corrections: move "samsa" to "Cafe" once and it lands there next time
 - Keyword-based fallback parser when the LLM is unavailable

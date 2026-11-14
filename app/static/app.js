@@ -1137,28 +1137,90 @@ async function importFile(event) {
 
 // ---------- Голосовой ввод (Chrome, Edge, Safari) ----------
 
+// Два способа голосового ввода:
+// 1) основной — записываем звук и распознаём на сервере (Whisper): точнее с суммами, именами
+//    и казахскими словами;
+// 2) запасной — встроенное распознавание браузера, если сервер или запись звука недоступны.
 function setupVoice() {
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!Recognition) return;
+  const canRecord = Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
+  if (!Recognition && !canRecord) return;
   const button = $("voice");
   const text = $("text");
   button.hidden = false;
 
-  // Слушаем, пока человек сам не нажмёт «Остановить»: паузы в речи запись не прерывают.
-  // Браузер всё равно иногда завершает распознавание сам — тогда тихо запускаем его заново.
-  let wanted = false;     // человек хочет, чтобы мы слушали
+  let mode = null;        // "server" | "browser" — что сейчас слушает
   let before = "";        // текст в поле до начала записи
-  let heard = "";         // окончательно распознанное за эту запись
-  let recognition = null;
-
   const join = (...parts) => parts.map((p) => p.trim()).filter(Boolean).join(", ");
   const setButton = (on) => {
     button.classList.toggle("listening", on);
     button.textContent = on ? "■ Остановить" : "Голосом";
     button.setAttribute("aria-pressed", String(on));
   };
+  const showText = (value) => {
+    text.value = value;
+    text.dispatchEvent(new Event("input")); // поле подстраивает высоту
+  };
 
-  function startSession() {
+  // ----- 1. Запись и распознавание на сервере -----
+  let recorder = null;
+  let stream = null;
+  let chunks = [];
+  let limitTimer = null;
+
+  const pickMime = () => ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"]
+    .find((m) => window.MediaRecorder.isTypeSupported?.(m)) || "";
+
+  async function startServer() {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    });
+    const mimeType = pickMime();
+    recorder = new MediaRecorder(stream, mimeType ? { mimeType, audioBitsPerSecond: 48000 } : undefined);
+    chunks = [];
+    recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    recorder.onstop = sendToServer;
+    recorder.start();
+    mode = "server";
+    setButton(true);
+    setStatus("Слушаю… Говорите сколько нужно, потом нажмите «Остановить»");
+    limitTimer = setTimeout(() => recorder?.state === "recording" && recorder.stop(), 3 * 60 * 1000);
+  }
+
+  async function sendToServer() {
+    clearTimeout(limitTimer);
+    stream?.getTracks().forEach((t) => t.stop());
+    mode = null;
+    setButton(false);
+    const type = (recorder.mimeType || "audio/webm");
+    const blob = new Blob(chunks, { type });
+    if (blob.size < 1000) return setStatus("Ничего не записалось — попробуйте ещё раз", true);
+    button.disabled = true;
+    button.textContent = "Распознаю…";
+    setStatus("Распознаю речь…");
+    try {
+      const response = await fetch("/api/transcribe", {
+        method: "POST", credentials: "same-origin", headers: { "Content-Type": type }, body: blob,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || "Не получилось распознать речь");
+      showText(join(before, data.text));
+      setStatus("");
+      await parseText(); // сразу разбираем: в предпросмотре всё можно поправить
+    } catch (error) {
+      setStatus(error.message, true);
+    } finally {
+      button.disabled = false;
+      button.textContent = "Голосом";
+    }
+  }
+
+  // ----- 2. Запасной вариант: распознавание браузера -----
+  // Слушаем, пока человек сам не нажмёт «Остановить»; если браузер сам прервал — перезапускаем.
+  let recognition = null;
+  let heard = "";
+
+  function startBrowserSession() {
     recognition = new Recognition();
     recognition.lang = "ru-RU";
     recognition.continuous = true;
@@ -1170,20 +1232,20 @@ function setupVoice() {
         if (event.results[i].isFinal) heard = join(heard, piece);
         else interim += piece;
       }
-      text.value = join(before, heard, interim); // промежуточный текст виден сразу
+      showText(join(before, heard, interim));
     };
     recognition.onerror = (event) => {
-      if (event.error === "no-speech" || event.error === "aborted") return; // тишина — не ошибка
-      wanted = false;
+      if (event.error === "no-speech" || event.error === "aborted") return;
+      mode = null;
       setStatus(event.error === "not-allowed"
         ? "Разрешите доступ к микрофону в настройках браузера"
         : "Голосовой ввод не сработал: " + event.error, true);
     };
     recognition.onend = () => {
-      if (wanted) {
-        try { startSession(); return; } catch (_) { wanted = false; }
+      if (mode === "browser") {
+        try { startBrowserSession(); return; } catch (_) { mode = null; }
       }
-      text.value = join(before, heard);
+      showText(join(before, heard));
       setButton(false);
       setStatus(heard ? "Готово — проверьте текст и нажмите «Разобрать»" : "");
       if (heard) text.focus();
@@ -1191,18 +1253,30 @@ function setupVoice() {
     recognition.start();
   }
 
-  button.addEventListener("click", () => {
-    if (wanted) {
-      wanted = false;
-      recognition?.stop();
-      return;
-    }
-    wanted = true;
-    before = text.value;
+  function startBrowser() {
     heard = "";
+    mode = "browser";
     setButton(true);
     setStatus("Слушаю… Говорите сколько нужно, потом нажмите «Остановить»");
-    try { startSession(); } catch (error) { wanted = false; setButton(false); setStatus(error.message, true); }
+    startBrowserSession();
+  }
+
+  button.addEventListener("click", async () => {
+    if (mode === "server") return recorder?.stop();
+    if (mode === "browser") { mode = null; return recognition?.stop(); }
+    before = text.value;
+    try {
+      if (state.sttEnabled && canRecord) await startServer();
+      else if (Recognition) startBrowser();
+      else setStatus("Голосовой ввод в этом браузере недоступен", true);
+    } catch (error) {
+      mode = null;
+      setButton(false);
+      stream?.getTracks().forEach((t) => t.stop());
+      setStatus(error.name === "NotAllowedError"
+        ? "Разрешите доступ к микрофону в настройках браузера"
+        : error.message, true);
+    }
   });
 }
 
@@ -1511,6 +1585,7 @@ async function init() {
   state.names = Object.fromEntries(data.categories.map((c) => [c.key, c.name]));
   state.order = Object.fromEntries(data.categories.map((c, i) => [c.key, i]));
   state.kinds = Object.fromEntries(data.categories.map((c) => [c.key, c.kind]));
+  state.sttEnabled = Boolean(health.stt_enabled);
   $("ai-note").textContent = health.ai_enabled
     ? ""
     : "ИИ не подключён: работает простой разбор. Пишите «категория сумма» через запятую.";

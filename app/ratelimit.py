@@ -48,4 +48,6 @@ register_limiter = RateLimiter(max_attempts=10, window_seconds=60 * 60)
 # 10 разборов месяца в час на пользователя — бережём бесплатный лимит ИИ
 insights_limiter = RateLimiter(max_attempts=10, window_seconds=60 * 60)
 # Демо-вход пересоздаёт данные — не чаще 20 раз в час с одного адреса
+# Распознавание голоса — не чаще 60 раз в час на пользователя
+speech_limiter = RateLimiter(max_attempts=60, window_seconds=60 * 60)
 demo_limiter = RateLimiter(max_attempts=20, window_seconds=60 * 60)

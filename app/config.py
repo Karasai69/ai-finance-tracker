@@ -34,6 +34,13 @@ class Settings:
         self.ai_base_url = os.getenv("AI_BASE_URL") or None
         self.ai_model = os.getenv("AI_MODEL") or None
         self.ai_timeout = float(os.getenv("AI_TIMEOUT", "20"))
+        # Распознавание речи (Whisper). У Groq — whisper-large-v3, у OpenAI — whisper-1
+        default_stt = None
+        if "groq.com" in (self.ai_base_url or ""):
+            default_stt = "whisper-large-v3"
+        elif not self.ai_base_url:
+            default_stt = "whisper-1"
+        self.stt_model = os.getenv("STT_MODEL") or default_stt
 
         # Вход в аккаунт
         self.secret_key = os.getenv("SECRET_KEY") or DEV_SECRET
@@ -47,6 +54,10 @@ class Settings:
     @property
     def ai_enabled(self) -> bool:
         return bool(self.ai_api_key and self.ai_model)
+
+    @property
+    def stt_enabled(self) -> bool:
+        return bool(self.ai_api_key and self.stt_model)
 
 
 settings = Settings()

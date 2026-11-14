@@ -5,7 +5,8 @@ import io
 from datetime import date
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
@@ -23,7 +24,9 @@ from app.insights import ai_insights, build_facts, rule_insights
 from app.migrate import run_migrations
 from app.parser.ai import AIParseError
 from app.periods import compare_ranges, month_range
-from app.ratelimit import insights_limiter
+from app.parser.speech import MAX_BYTES as SPEECH_MAX_BYTES
+from app.parser.speech import SpeechError, transcribe
+from app.ratelimit import insights_limiter, speech_limiter
 from app.personalize import build_examples
 from app.models import Budget, Transaction, User
 from app.schemas import (
@@ -108,7 +111,32 @@ def favicon():
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "ai_enabled": settings.ai_enabled, "version": APP_VERSION}
+    return {"status": "ok", "ai_enabled": settings.ai_enabled, "stt_enabled": settings.stt_enabled,
+            "version": APP_VERSION}
+
+
+@app.post("/api/transcribe")
+async def transcribe_voice(request: Request, user: User = Depends(get_current_user)):
+    """Голос → текст (Whisper). Тело запроса — аудио как есть (audio/webm, audio/mp4 …)."""
+    if not settings.stt_enabled:
+        raise HTTPException(503, "Распознавание речи на сервере не настроено")
+    content_type = request.headers.get("content-type", "")
+    if not content_type.startswith("audio/"):
+        raise HTTPException(415, "Нужен аудиофайл")
+    audio = await request.body()
+    if not audio:
+        raise HTTPException(422, "Пустая запись")
+    if len(audio) > SPEECH_MAX_BYTES:
+        raise HTTPException(413, "Запись слишком длинная — разбейте на части")
+    key = f"user:{user.id}"
+    if speech_limiter.is_blocked(key):
+        raise HTTPException(429, "Слишком много голосовых записей подряд, попробуйте позже")
+    speech_limiter.hit(key)
+    try:
+        text = await run_in_threadpool(transcribe, audio, content_type)
+    except SpeechError as exc:
+        raise HTTPException(502, str(exc)) from exc
+    return {"text": text}
 
 
 @app.get("/api/categories")
