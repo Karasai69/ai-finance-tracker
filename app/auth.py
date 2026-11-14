@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.models import Budget, Transaction, User
-from app.ratelimit import login_limiter, register_limiter
+from app.demo import DEMO_EMAIL, seed_demo
+from app.ratelimit import demo_limiter, login_limiter, register_limiter
 from app.schemas import AccountDelete, AuthResponse, Credentials, PasswordChange, UserOut
 from app.security import create_token, hash_password, password_stamp, read_claims, verify_password
 
@@ -98,6 +99,18 @@ def login(body: Credentials, request: Request, response: Response, db: Session =
     return AuthResponse(user=UserOut.model_validate(user), access_token=token)
 
 
+@router.post("/demo", response_model=AuthResponse)
+def demo(request: Request, response: Response, db: Session = Depends(get_db)):
+    """Вход в демо-аккаунт с готовыми данными — чтобы посмотреть приложение без регистрации."""
+    key = _client_ip(request)
+    if demo_limiter.is_blocked(key):
+        raise _too_many(demo_limiter, key, "Демо открывали слишком часто, попробуйте позже")
+    demo_limiter.hit(key)
+    user = seed_demo(db)
+    token = _issue(response, user)
+    return AuthResponse(user=UserOut.model_validate(user), access_token=token)
+
+
 @router.post("/logout", status_code=204)
 def logout():
     response = Response(status_code=204)
@@ -131,6 +144,8 @@ def change_password(
     db: Session = Depends(get_db),
 ):
     """Смена пароля. Остальные устройства выходят из аккаунта, это — остаётся."""
+    if user.email == DEMO_EMAIL:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "В демо-аккаунте пароль не меняется")
     _check_password(user, body.current_password, request)
     if body.new_password == body.current_password:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Новый пароль совпадает с текущим")
@@ -148,6 +163,8 @@ def delete_account(
     db: Session = Depends(get_db),
 ):
     """Удаляет аккаунт и все его данные без возможности восстановления."""
+    if user.email == DEMO_EMAIL:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Демо-аккаунт удалить нельзя")
     _check_password(user, body.password, request)
     db.execute(delete(Transaction).where(Transaction.user_id == user.id))
     db.execute(delete(Budget).where(Budget.user_id == user.id))

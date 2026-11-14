@@ -26,9 +26,9 @@ def make_client():
     from app.database import Base, engine
     from app.main import app
 
-    from app.ratelimit import insights_limiter, login_limiter, register_limiter
+    from app.ratelimit import demo_limiter, insights_limiter, login_limiter, register_limiter
 
-    for limiter in (login_limiter, register_limiter, insights_limiter):
+    for limiter in (login_limiter, register_limiter, insights_limiter, demo_limiter):
         limiter.reset()
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)

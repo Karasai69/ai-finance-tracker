@@ -1353,6 +1353,18 @@ async function init() {
   setView(["list", "calendar"].includes(storage.get("view")) ? storage.get("view") : "table");
 
   $("auth-form").addEventListener("submit", submitAuth);
+  $("auth-demo").addEventListener("click", async () => {
+    $("auth-demo").disabled = true;
+    $("auth-error").textContent = "";
+    try {
+      showApp((await api("/api/auth/demo", { method: "POST" })).user);
+      setStatus("Это демо-аккаунт с придуманными данными — можно смело пробовать всё подряд");
+    } catch (error) {
+      $("auth-error").textContent = error.message;
+    } finally {
+      $("auth-demo").disabled = false;
+    }
+  });
   $("auth-switch").addEventListener("click", () => setAuthMode(state.authMode === "login" ? "register" : "login"));
   $("logout").addEventListener("click", logout);
   $("open-account").addEventListener("click", openAccount);

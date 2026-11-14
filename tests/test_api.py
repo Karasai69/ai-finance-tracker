@@ -325,3 +325,40 @@ def test_excel_export_and_import_round_trip(make_client):
 
     assert bob.post("/api/import", json={"xlsx": "!!!"}).status_code == 422
     assert bob.post("/api/import", json={}).status_code == 422
+
+
+def test_demo_login_seeds_fresh_data(make_client):
+    from datetime import date
+
+    c = make_client()
+    r = c.post("/api/auth/demo")
+    assert r.status_code == 200 and r.json()["user"]["email"] == "demo@finance.demo"
+    month = date.today().strftime("%Y-%m")
+    rows = c.get("/api/transactions", params={"month": month}).json()
+    assert rows, "в текущем месяце есть записи"
+    assert c.get("/api/budgets").json()
+
+    # Посетитель удалил запись — следующий демо-вход вернёт данные как были
+    c.delete(f"/api/transactions/{rows[0]['id']}")
+    other = make_client()
+    other.post("/api/auth/demo")
+    assert len(other.get("/api/transactions", params={"month": month}).json()) == len(rows)
+
+    # Демо нельзя удалить или сменить ему пароль
+    assert other.request("DELETE", "/api/auth/account", json={"password": "x"}).status_code == 403
+    assert other.post("/api/auth/password", json={"current_password": "x", "new_password": "newpass123"}).status_code == 403
+
+
+def test_demo_seed_without_api():
+    import pytest
+
+    pytest.importorskip("sqlalchemy")
+    from datetime import date
+
+    from app.demo import _month_rows
+    import random
+
+    rows = _month_rows(1, date(2026, 10, 1), date(2026, 10, 31), random.Random(1))
+    kinds = {r.kind for r in rows}
+    assert {"expense", "income", "lend", "repaid"} <= kinds
+    assert all(r.amount > 0 for r in rows)
