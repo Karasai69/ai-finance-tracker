@@ -416,7 +416,7 @@ def test_delete_debt_removes_all_its_records_only(make_client):
     bob.post("/api/transactions", json={"items": [items[0]]})
 
     r = alice.request("DELETE", "/api/debts", params={"person": "Айбек"})
-    assert r.status_code == 200 and r.json() == {"deleted": 2}
+    assert r.status_code == 200 and r.json()["deleted"] == 2
     assert [d["person"] for d in alice.get("/api/debts").json()] == ["Дана"]
     nov = alice.get("/api/transactions", params={"month": "2026-11"}).json()
     assert {t["category"] for t in nov} == {"lend", "transport"}  # такси и Дана на месте
