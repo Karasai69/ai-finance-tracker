@@ -18,28 +18,29 @@ from app.security import hash_password
 
 DEMO_EMAIL = "demo@finance.demo"
 
-# (категория, описание, мин, макс, вероятность в день)
+# (категория, варианты описаний, мин, макс, вероятность в день) — будни обычного студента
 DAILY = [
-    ("products", "продукты", 900, 4200, 0.45),
-    ("vegetables", "овощи и фрукты", 300, 1400, 0.3),
-    ("convenience", "магазин у дома", 250, 1300, 0.35),
-    ("cafe", "самса", 300, 700, 0.25),
-    ("cafe", "кофе", 600, 1200, 0.15),
-    ("transport", "такси", 600, 2200, 0.35),
-    ("transport", "автобус", 100, 100, 0.4),
-    ("charity", "садака", 200, 1000, 0.5),
-    ("nuts", "орехи", 300, 900, 0.1),
+    ("products", ["Magnum: продукты", "Small: продукты", "продукты на неделю", "молоко и хлеб"], 900, 5200, 0.38),
+    ("vegetables", ["овощи и фрукты", "яблоки и бананы", "овощи на базаре"], 400, 1600, 0.25),
+    ("convenience", ["магазин у дома", "вода и снеки", "сок и печенье"], 300, 1200, 0.3),
+    ("cafe", ["кофе", "обед в столовой", "самса", "кофе с другом", "шаурма"], 500, 2200, 0.45),
+    ("transport", ["такси до универа", "такси домой", "Яндекс Такси"], 700, 2200, 0.28),
+    ("transport", ["автобус"], 120, 120, 0.45),
+    ("charity", ["пожертвование"], 300, 1000, 0.12),
 ]
 MONTHLY = [
-    (3, "household", "порошок и губки", 2400),
-    (7, "laundry", "прачечная", 1200),
-    (10, "books", "книга по алгоритмам", 6500),
+    (2, "other", "мобильная связь", 3500),
+    (3, "household", "порошок и губки", 2600),
+    (6, "other", "подписка на музыку", 1890),
+    (8, "laundry", "прачечная", 1400),
+    (11, "books", "курс по Python", 7900),
     (12, "sport", "абонемент в зал", 15000),
-    (18, "clothes", "кроссовки", 18000),
+    (16, "cafe", "день рождения друга, кафе", 8500),
+    (18, "clothes", "кроссовки", 24000),
     (21, "gift", "подарок маме", 9000),
-    (25, "other", "мобильная связь", 3500),
+    (27, "household", "лампа на стол", 6400),
 ]
-LIMITS = {"transport": 15000, "cafe": 8000, "products": 30000}
+LIMITS = {"transport": 25000, "cafe": 20000, "products": 35000}
 
 
 def _round(value: float, step: int = 10) -> Decimal:
@@ -57,25 +58,26 @@ def _month_rows(user_id: int, first: date, last: date, rng: random.Random) -> li
 
     day = first
     while day <= last:
-        for category, text, low, high, chance in DAILY:
+        for category, texts, low, high, chance in DAILY:
             if rng.random() < chance:
-                add(day, category, _round(rng.uniform(low, high), 50 if high > 1000 else 10), text)
+                add(day, category, _round(rng.uniform(low, high), 50 if high > 1000 else 10), rng.choice(texts))
         day += timedelta(days=1)
 
     for dom, category, text, amount in MONTHLY:
         if dom <= last.day:
             add(first.replace(day=dom), category, Decimal(amount), text)
-    if last.day >= 5:
-        add(first.replace(day=5), "income", Decimal(180000), "стипендия и подработка")
-    if last.day >= 20:
-        add(first.replace(day=20), "income", Decimal(40000), "брат прислал")
-        add(first.replace(day=20), "ten_percent", Decimal(4000), "10% от дохода")
+    if last.day >= 1:
+        add(first, "income", Decimal(42000), "стипендия")
+    if last.day >= 10:
+        add(first.replace(day=10), "income", Decimal(150000), "зарплата: подработка")
+    if last.day >= 22:
+        add(first.replace(day=22), "income", Decimal(30000), "фриланс: сайт для кофейни")
     if last.day >= 9:
-        add(first.replace(day=9), "lend", Decimal(15000), "", "Алижан")
+        add(first.replace(day=9), "lend", Decimal(10000), "", "Айбек")
     if last.day >= 14:
-        add(first.replace(day=14), "lend", Decimal(5000), "", "Мадияр")
+        add(first.replace(day=14), "lend", Decimal(5000), "", "Дана")
     if last.day >= 24:
-        add(first.replace(day=24), "repaid", Decimal(5000), "", "Мадияр")
+        add(first.replace(day=24), "repaid", Decimal(5000), "", "Дана")
     return rows
 
 

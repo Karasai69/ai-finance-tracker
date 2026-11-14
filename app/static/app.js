@@ -1212,6 +1212,10 @@ function showApp(user) {
   $("rail-nav").hidden = false;
   $("account").hidden = false;
   $("user-email").textContent = user.email;
+  const isDemo = user.email === "demo@finance.demo";
+  $("demo-banner").hidden = !isDemo;
+  // В демо поле уже заполнено примером — остаётся нажать «Разобрать»
+  if (isDemo && !$("text").value) $("text").value = "кофе 900, такси до универа 1 200, друг вернул 5 000";
   requestAnimationFrame(drawGuilloche);
   setMonth(state.month || todayISO().slice(0, 7));
 }
@@ -1457,12 +1461,17 @@ async function init() {
     $("auth-error").textContent = "";
     try {
       showApp((await api("/api/auth/demo", { method: "POST" })).user);
-      setStatus("Это демо-аккаунт с придуманными данными — можно смело пробовать всё подряд");
     } catch (error) {
       $("auth-error").textContent = error.message;
     } finally {
       $("auth-demo").disabled = false;
     }
+  });
+  $("demo-close").addEventListener("click", () => ($("demo-banner").hidden = true));
+  $("demo-signup").addEventListener("click", async () => {
+    await logout();
+    $("text").value = "";
+    setAuthMode("register");
   });
   $("auth-switch").addEventListener("click", () => setAuthMode(state.authMode === "login" ? "register" : "login"));
   $("logout").addEventListener("click", logout);
