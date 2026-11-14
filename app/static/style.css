@@ -291,7 +291,18 @@ input, select, textarea { border-radius: 2px; }
 .bar-fill { height: 100%; background: var(--teal); }
 .bar-fill.near { background: var(--ochre); }
 .bar-fill.over { background: var(--brick); }
-.bar-limit { position: absolute; top: -5px; bottom: -5px; width: 2px; margin-left: -1px; background: var(--ink); }
+.bar-limit { position: absolute; top: -5px; bottom: -5px; width: 2px; margin-left: -1px; background: var(--ink); cursor: help; outline: none; }
+/* Широкая невидимая зона, чтобы на черту было легко навести или нажать */
+.bar-limit::before { content: ""; position: absolute; inset: -6px -9px; }
+/* Подсказка «Лимит …» */
+.bar-limit::after {
+  content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translate(-50%, 4px);
+  padding: 5px 9px; border-radius: 4px; white-space: nowrap; pointer-events: none; z-index: 5;
+  background: var(--ink); color: #fbf8f1; font: 600 12.5px var(--body);
+  box-shadow: 0 6px 16px -6px rgba(42, 20, 24, .5); opacity: 0; transition: opacity .15s, transform .15s;
+}
+.bar-limit:hover::after, .bar-limit:focus::after { opacity: 1; transform: translate(-50%, 0); }
+.bar-limit:hover, .bar-limit:focus { background: var(--ochre); }
 .bar-meta { grid-area: meta; display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
 .bar-note.near { color: var(--ochre); }
 .bar-note.over { color: var(--brick); font-weight: 500; }

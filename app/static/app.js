@@ -272,7 +272,8 @@ function renderSummary(summary) {
     fill.style.width = `${(cat.total / scale) * 100}%`;
     const track = el("div", { class: "bar-track" }, fill);
     if (cat.limit) {
-      const mark = el("span", { class: "bar-limit", title: `Лимит ${money(cat.limit)}` });
+      const mark = el("span", { class: "bar-limit", tabindex: "0", "aria-label": `Лимит ${money(cat.limit)}`,
+        "data-tip": `Лимит ${money(cat.limit)}` });
       mark.style.left = `${(cat.limit / scale) * 100}%`;
       track.append(mark);
     }
