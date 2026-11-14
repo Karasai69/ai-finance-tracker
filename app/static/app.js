@@ -94,6 +94,7 @@ function setMonth(month) {
   if (month !== state.month) resetReview();
   state.month = month;
   $("month-label").textContent = monthLabel(month);
+  $("ledger-title").textContent = monthLabel(month).split(" ")[0];
   $("export").href = `/api/export.xlsx?month=${month}`;
   refresh();
 }
@@ -204,22 +205,28 @@ function periodLabel(month, days) {
 }
 
 function renderComparison(summary) {
-  const box = $("compare");
+  const chip = $("compare");
   const days = summary.compare_days;
-  if (!summary.expense_to_date && !summary.prev_expense) return (box.textContent = "");
+  chip.className = "compare-chip";
+  if (!summary.expense_to_date && !summary.prev_expense) { chip.hidden = true; return; }
   const now = periodLabel(summary.month, days);
   const before = periodLabel(summary.prev_month, days);
+  chip.hidden = false;
   if (!summary.prev_expense) {
-    box.textContent = `Расходы ${now}: ${money(summary.expense_to_date)}. ${before[0].toUpperCase()}${before.slice(1)} записей нет — сравнивать не с чем.`;
+    chip.classList.add("flat");
+    chip.textContent = `${before[0].toUpperCase()}${before.slice(1)} записей нет`;
+    chip.title = `Расходы ${now}: ${money(summary.expense_to_date)}`;
     return;
   }
   const diff = summary.expense_to_date - summary.prev_expense;
   const pct = Math.round(Math.abs(diff) / summary.prev_expense * 100);
-  const verdict = pct === 0 ? "столько же, сколько" : `на ${pct}% ${diff > 0 ? "больше" : "меньше"}, чем`;
-  box.replaceChildren(
-    `Расходы ${now}: `, el("b", {}, money(summary.expense_to_date)),
-    ` — ${verdict} ${before} (${money(summary.prev_expense)}).`,
-  );
+  const prevMonth = MONTHS_GEN[Number(summary.prev_month.slice(5, 7)) - 1];
+  if (pct === 0) chip.classList.add("flat");
+  else if (diff > 0) chip.classList.add("up");
+  chip.textContent = pct === 0
+    ? `расходы как в ${MONTHS_PREP[Number(summary.prev_month.slice(5, 7)) - 1]}`
+    : `расходы на ${pct}% ${diff > 0 ? "больше" : "меньше"} ${prevMonth}`;
+  chip.title = `Расходы ${now}: ${money(summary.expense_to_date)}, ${before}: ${money(summary.prev_expense)}`;
 }
 
 function limitWarnings(categories) {
@@ -595,11 +602,11 @@ function renderTable(rows) {
 
 // Группы для цветных точек: цвет — подсказка, название группы есть в легенде и в списке дня
 const CAL_GROUPS = [
-  { name: "Еда", color: "#0f4f54", cats: ["products", "vegetables", "convenience", "cafe", "nuts"] },
-  { name: "Дорога", color: "#b07d2b", cats: ["transport"] },
-  { name: "Отдаю", color: "#a3412f", cats: ["charity", "gift", "ten_percent"] },
-  { name: "Быт и одежда", color: "#6f8f86", cats: ["household", "laundry", "housing", "clothes"] },
-  { name: "Развитие", color: "#3d6fa3", cats: ["books", "sport"] },
+  { name: "Еда", color: "#7a1f33", cats: ["products", "vegetables", "convenience", "cafe", "nuts"] },
+  { name: "Дорога", color: "#a8822e", cats: ["transport"] },
+  { name: "Отдаю", color: "#c0563f", cats: ["charity", "gift", "ten_percent"] },
+  { name: "Быт и одежда", color: "#8a7a6a", cats: ["household", "laundry", "housing", "clothes"] },
+  { name: "Развитие", color: "#2f5d7a", cats: ["books", "sport"] },
   { name: "Другое", color: "#9aa8a3", cats: ["other"] },
 ];
 const CAL_COLOR = Object.fromEntries(CAL_GROUPS.flatMap((g) => g.cats.map((c) => [c, g.color])));
@@ -971,6 +978,7 @@ async function refresh() {
     ]);
     state.debts = debts;
     renderDebts();
+    $("nav-debts").hidden = $("debts").hidden;
     if (month !== state.month) return; // пока грузили, переключили месяц
     state.rows = rows;
     renderSummary(summary);
@@ -1097,6 +1105,7 @@ function showAuth() {
   $("intro").hidden = false;
   requestAnimationFrame(drawGuilloche);
   document.querySelector(".month").hidden = true;
+  $("rail-nav").hidden = true;
   $("account").hidden = true;
   $("auth").hidden = false;
   $("auth-email").focus();
@@ -1109,6 +1118,7 @@ function showApp(user) {
   $("hero").hidden = false;
   $("intro").hidden = true;
   document.querySelector(".month").hidden = false;
+  $("rail-nav").hidden = false;
   $("account").hidden = false;
   $("user-email").textContent = user.email;
   requestAnimationFrame(drawGuilloche);
@@ -1232,17 +1242,20 @@ async function deleteAccount(event) {
 // Гильош — переплетение синусоид, как на банкнотах. Рисуется под ширину шапки.
 function drawGuilloche() {
   const svg = $("guilloche");
-  const W = Math.max(600, Math.round(svg.clientWidth || window.innerWidth));
-  const H = Math.max(200, Math.round(svg.clientHeight || 330));
+  const W = Math.max(200, Math.round(svg.clientWidth || 300));
+  const H = Math.max(200, Math.round(svg.clientHeight || 900));
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const tall = H > W * 1.4; // боковая панель — линии идут сверху вниз, мобильная шапка — слева направо
+  const [len, across] = tall ? [H, W] : [W, H];
   let paths = "";
-  for (let k = 0; k < 26; k++) {
+  for (let k = 0; k < 18; k++) {
     let d = "";
-    for (let x = 0; x <= W; x += 6) {
-      const y = H * 0.55 + Math.sin(x / 70 + k * 0.24) * (H * 0.11 + k * 2.2) + Math.sin(x / 23 + k) * 6;
-      d += `${x ? "L" : "M"}${x},${y.toFixed(1)}`;
+    for (let t = 0; t <= len; t += 6) {
+      const v = across * 0.5 + Math.sin(t / 110 + k * 0.35) * (across * 0.3 + k * 2) + Math.sin(t / 29 + k) * 5;
+      const [x, y] = tall ? [v, t] : [t, v];
+      d += `${t ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`;
     }
-    paths += `<path d="${d}" fill="none" stroke="${k % 3 ? "#2C7B78" : "#C9A15A"}" stroke-width="0.6"/>`;
+    paths += `<path d="${d}" fill="none" stroke="${k % 3 ? "#8a3a4e" : "#C9A15A"}" stroke-width="0.6"/>`;
   }
   svg.innerHTML = paths;
 }
@@ -1259,7 +1272,8 @@ function drawRosette() {
     paths += `<path d="${d}" fill="none" stroke="#D8B46A" stroke-width="0.5" opacity=".8"/>`;
   }
   $("rosette").innerHTML = paths +
-    '<text x="100" y="109" text-anchor="middle" font-family="IBM Plex Serif, Georgia, serif" font-size="30" font-weight="700" fill="#E9F0EA">₸</text>';
+    '<circle cx="100" cy="100" r="33" fill="#4a1524" stroke="#DCB866" stroke-width="1"/>' +
+    '<text x="100" y="109" text-anchor="middle" font-family="Playfair Display, Georgia, serif" font-size="30" font-weight="700" fill="#F6ECE1">₸</text>';
 }
 
 // ---------- Установка как приложение ----------
@@ -1306,6 +1320,15 @@ async function init() {
   $("tab-table").addEventListener("click", () => setView("table"));
   $("tab-list").addEventListener("click", () => setView("list"));
   $("tab-calendar").addEventListener("click", () => setView("calendar"));
+  const goTo = (node) => node.scrollIntoView({ behavior: "smooth", block: "start" });
+  $("nav-review").addEventListener("click", () => goTo(document.querySelector(".review")));
+  $("nav-debts").addEventListener("click", () => goTo($("debts")));
+  $("nav-limits").addEventListener("click", () => openLimits().catch((e) => setStatus(e.message, true)));
+  for (const id of ["tab-calendar", "tab-table", "tab-list"]) {
+    $(id).addEventListener("click", () => {
+      if (matchMedia("(max-width: 900px)").matches) goTo(document.querySelector(".ledger"));
+    });
+  }
   const grow = () => {
     const t = $("text");
     t.style.height = "auto";

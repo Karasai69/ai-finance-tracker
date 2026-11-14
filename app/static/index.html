@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0f4f54">
+  <meta name="theme-color" content="#4a1524">
   <meta name="description" content="Учёт расходов обычным текстом: ИИ раскладывает траты по категориям, таблица и итоги считаются сами">
   <title>Финансы</title>
   <link rel="manifest" href="/manifest.webmanifest">
@@ -15,32 +15,27 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Arsenal+SC&family=IBM+Plex+Serif:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <header class="note">
+  <div class="shell">
+  <aside class="rail" aria-label="Итоги и меню">
     <svg class="guilloche" id="guilloche" aria-hidden="true" preserveAspectRatio="none"></svg>
-    <div class="note-inner">
-      <div class="note-top">
+    <div class="rail-inner">
+      <div class="rail-top">
         <span class="brand">Финансы</span>
         <nav class="month" aria-label="Выбор месяца" hidden>
           <button type="button" id="prev-month" class="month-arrow" aria-label="Предыдущий месяц">‹</button>
           <span id="month-label" class="month-label"></span>
           <button type="button" id="next-month" class="month-arrow" aria-label="Следующий месяц">›</button>
         </nav>
-        <div class="account" id="account" hidden>
-          <button type="button" id="install" class="logout install">Установить приложение</button>
-          <span id="user-email" class="serial"></span>
-          <button type="button" id="open-account" class="logout">Аккаунт</button>
-          <button type="button" id="logout" class="logout">Выйти</button>
-        </div>
       </div>
 
       <section id="intro" class="hero intro" hidden>
         <p class="hero-label">Личный учёт денег</p>
         <p class="intro-title">Пишите траты как в заметках — таблица, итоги и долги посчитаются сами</p>
-        <p class="intro-example">«такси 300, самса 500, брат прислал 10 000» → три записи по категориям</p>
+        <p class="intro-example">«такси 300, обед 1 500, брат прислал 10 000» → три записи по категориям</p>
       </section>
 
       <section id="hero" class="hero" aria-label="Итоги месяца" hidden>
@@ -52,12 +47,33 @@
           <div><dt>Дал в долг</dt><dd id="sum-lent">0 ₸</dd></div>
           <div id="repaid-box" hidden><dt>Вернули долг</dt><dd id="sum-repaid">0 ₸</dd></div>
         </dl>
-        <p id="compare" class="compare"></p>
       </section>
-    </div>
-    <svg class="rosette" id="rosette" viewBox="0 0 200 200" aria-hidden="true"></svg>
-  </header>
 
+      <nav id="rail-nav" class="rail-nav" aria-label="Разделы" hidden>
+        <div role="tablist" aria-label="Вид записей" class="rail-tabs">
+          <button type="button" role="tab" id="tab-calendar" class="tab" aria-selected="false">Календарь</button>
+          <button type="button" role="tab" id="tab-table" class="tab" aria-selected="true">Таблица</button>
+          <button type="button" role="tab" id="tab-list" class="tab" aria-selected="false">Список</button>
+        </div>
+        <button type="button" id="nav-review" class="tab">Разбор месяца</button>
+        <button type="button" id="nav-debts" class="tab" hidden>Долги</button>
+        <button type="button" id="nav-limits" class="tab">Лимиты</button>
+      </nav>
+
+      <svg class="rosette" id="rosette" viewBox="0 0 200 200" aria-hidden="true"></svg>
+
+      <div class="account" id="account" hidden>
+        <button type="button" id="install" class="logout install">Установить приложение</button>
+        <span id="user-email" class="serial"></span>
+        <span class="account-links">
+          <button type="button" id="open-account" class="logout">Аккаунт</button>
+          <button type="button" id="logout" class="logout">Выйти</button>
+        </span>
+      </div>
+    </div>
+  </aside>
+
+  <div class="content">
   <section id="auth" class="auth" hidden>
     <form id="auth-form" class="auth-card" novalidate>
       <h1 id="auth-title">Вход</h1>
@@ -79,9 +95,11 @@
   <main id="app" hidden>
     <section class="entry" aria-label="Новая запись">
       <div class="entry-line">
-        <label for="text" class="entry-label">Что потратили?</label>
-        <textarea id="text" rows="1"
-          placeholder="такси 300, самса 500, брат прислал 10 000"></textarea>
+        <div class="entry-field">
+          <label for="text" class="entry-label">Что потратили?</label>
+          <textarea id="text" rows="1"
+            placeholder="Например: такси 300, обед 1 500, брат прислал 10 000"></textarea>
+        </div>
         <input type="date" id="date" aria-label="Дата">
         <button type="button" id="voice" class="btn ghost" hidden>Голосом</button>
         <button type="button" id="parse" class="btn primary">Разобрать</button>
@@ -104,11 +122,7 @@
         <section class="ledger" aria-labelledby="ledger-title">
           <div class="ledger-bar">
             <h2 id="ledger-title">Записи</h2>
-            <div class="tabs" role="tablist">
-              <button type="button" role="tab" id="tab-table" class="tab" aria-selected="true">Таблица</button>
-              <button type="button" role="tab" id="tab-calendar" class="tab" aria-selected="false">Календарь</button>
-              <button type="button" role="tab" id="tab-list" class="tab" aria-selected="false">Список</button>
-            </div>
+            <span id="compare" class="compare-chip" hidden></span>
             <div class="ledger-actions">
               <button type="button" id="import" class="export link-btn" title="Файл Excel в формате выгрузки (подойдёт и CSV)">Загрузить из Excel</button>
               <input type="file" id="import-file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden>
@@ -131,10 +145,13 @@
         </section>
       </div>
 
-      <aside class="side">
-        <section class="chart-panel" aria-labelledby="daily-title">
-          <h2 id="daily-title">Расходы по дням</h2>
-          <div id="daily-chart" class="daily-chart"></div>
+      <aside class="side-col">
+        <section class="categories" aria-labelledby="cat-title">
+          <div class="section-head">
+            <h2 id="cat-title">Куда ушли деньги</h2>
+            <button type="button" id="open-limits" class="link-btn">Лимиты</button>
+          </div>
+          <div id="categories" class="bars"></div>
         </section>
 
         <section id="debts" class="debts" aria-labelledby="debts-title" hidden>
@@ -145,16 +162,15 @@
           <div id="debts-list"></div>
         </section>
 
-        <section class="categories" aria-labelledby="cat-title">
-          <div class="section-head">
-            <h2 id="cat-title">Куда ушли деньги</h2>
-            <button type="button" id="open-limits" class="link-btn">Лимиты</button>
-          </div>
-          <div id="categories" class="bars"></div>
+        <section class="chart-panel" aria-labelledby="daily-title">
+          <h2 id="daily-title">Расходы по дням</h2>
+          <div id="daily-chart" class="daily-chart"></div>
         </section>
       </aside>
     </div>
   </main>
+  </div>
+  </div>
 
   <dialog id="editor" class="editor" aria-labelledby="editor-title">
     <div class="editor-head">
