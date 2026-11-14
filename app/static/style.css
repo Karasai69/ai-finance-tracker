@@ -768,3 +768,16 @@ body[data-screen="debts"] .debts-total { font-size: 26px; }
 .debt-closed-item .debt-remove { margin-left: 8px; font-size: 12.5px; }
 
 .row-confirm { margin-top: 10px; }
+
+/* Сегодня · в среднем в день · за месяц — над календарём */
+.day-stats { display: flex; gap: 22px; margin: 0 0 0 auto; }
+.day-stats div { text-align: right; }
+.day-stats dt { font-size: 12px; color: var(--muted); }
+.day-stats dd { margin: 0; font: 700 16px var(--num); white-space: nowrap; }
+body:not([data-screen="home"]) .day-stats { display: none; }
+@media (max-width: 720px) {
+  .day-stats { width: 100%; margin: 6px 0 0; gap: 0; justify-content: space-between;
+    padding: 8px 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+  .day-stats div { text-align: left; }
+  .day-stats dd { font-size: 15px; }
+}

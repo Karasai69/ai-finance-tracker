@@ -679,7 +679,27 @@ const CAL_GROUPS = [
 ];
 const CAL_COLOR = Object.fromEntries(CAL_GROUPS.flatMap((g) => g.cats.map((c) => [c, g.color])));
 
+// Над календарём: сегодня, в среднем в день и всего за месяц
+function renderDayStats(rows) {
+  const box = $("day-stats");
+  const spent = rows.filter((r) => r.kind === "expense");
+  const total = spent.reduce((s, r) => s + r.amount, 0);
+  const [y, m] = state.month.split("-").map(Number);
+  const today = todayISO();
+  const isCurrent = today.startsWith(state.month);
+  if (!total || today < `${state.month}-01`) { box.hidden = true; return; }
+  // Среднее — по прошедшим дням месяца (для текущего месяца — по сегодняшний день)
+  const days = isCurrent ? Number(today.slice(8, 10)) : new Date(y, m, 0).getDate();
+  const items = [];
+  if (isCurrent) items.push(["Сегодня", money(spent.filter((r) => r.date === today).reduce((s, r) => s + r.amount, 0))]);
+  items.push(["В среднем в день", money(Math.round(total / days))]);
+  items.push([isCurrent ? `За ${days} ${plural(days, "день", "дня", "дней")}` : "За месяц", money(total)]);
+  box.replaceChildren(...items.map(([k, v]) => el("div", {}, el("dt", {}, k), el("dd", {}, v))));
+  box.hidden = false;
+}
+
 function renderCalendar(rows) {
+  renderDayStats(rows);
   const box = $("view-calendar");
   box.replaceChildren();
   const [y, m] = state.month.split("-").map(Number);
