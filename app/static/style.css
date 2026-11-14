@@ -89,6 +89,8 @@ h2 { font-size: 22px; margin: 0; }
 .rail-nav .tab[aria-selected="true"] {
   color: var(--note-text); font-weight: 600; background: rgba(220, 184, 102, .16); box-shadow: inset 3px 0 0 var(--ochre-light);
 }
+.nav-ico, .rail-nav .sm, #nav-account, .bars-more { display: none; }
+.account-quick { display: none; }
 .rosette { display: block; width: 130px; height: 130px; margin: 22px auto 0; flex: none; }
 @media (max-height: 860px) and (min-width: 901px) { .rosette { display: none; } .rail-nav { margin-top: 18px; } }
 
@@ -412,6 +414,7 @@ input, select, textarea { border-radius: 2px; }
 .danger-zone h3 { color: var(--brick); }
 
 /* ---------- Календарь ---------- */
+.cal-below > * { min-width: 0; }
 .cal-below { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; margin-top: 18px; align-items: start; }
 .cal-legend i.ring, .cal-dots i.ring { background: transparent; border: 1.5px solid var(--teal-2); }
 .cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid var(--rule); border-left: 1px solid var(--rule); }
@@ -517,3 +520,71 @@ input, select, textarea { border-radius: 2px; }
 
 .auth-or { display: flex; align-items: center; gap: 10px; margin: 14px 0; color: var(--muted); font-size: 13px; }
 .auth-or::before, .auth-or::after { content: ""; flex: 1; border-top: 1px solid var(--rule); }
+
+/* ---------- Телефон: шапка, нижняя панель вкладок, только главное ---------- */
+@media (max-width: 720px) {
+  html, body { overflow-x: clip; }
+  body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+  .rail { z-index: 30; } /* нижняя панель вкладок живёт внутри шапки — шапка должна быть выше страницы */
+  .rail-inner { padding: 14px 16px 16px; }
+  .brand { font-size: 21px; }
+  .month-arrow { width: 28px; height: 28px; }
+  .hero { margin-top: 10px; }
+  .hero-label { font-size: 13px; }
+  .hero-value { font-size: 38px; }
+  .flows { margin-top: 10px; }
+  .flows > div { padding: 6px 0; }
+  .flows dt { font-size: 12.5px; }
+  .flows dd { font-size: 14.5px; }
+  .account { display: none; }
+
+  /* Нижняя панель как в приложении */
+  .rail-nav {
+    position: fixed; z-index: 40; left: 0; right: 0; bottom: 0; margin: 0;
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 0;
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+    background: var(--wine); border-top: 1px solid rgba(220, 184, 102, .25);
+    box-shadow: 0 -6px 18px rgba(42, 20, 24, .18); overflow: visible;
+  }
+  .rail-nav .tab {
+    display: flex; flex-direction: column; align-items: center; gap: 2px; width: auto;
+    padding: 6px 2px; font-size: 11px; text-align: center; border-radius: 6px; white-space: nowrap;
+  }
+  .rail-nav .tab[aria-selected="true"] { box-shadow: none; background: rgba(220, 184, 102, .16); color: var(--ochre-light); }
+  .nav-ico { display: block; width: 22px; height: 22px; }
+  .nav-ico svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  #nav-account { display: flex; }
+  #nav-debts, #nav-limits { display: none !important; }
+  .rail-nav .lg { display: none; }
+  .rail-nav .sm { display: inline; }
+  .account-quick { display: flex; gap: 8px; padding: 12px 20px 0; flex-wrap: wrap; }
+  .account-quick .btn { padding: 8px 14px; font-size: 14px; }
+
+  /* Ввод: поле на всю ширину, под ним одна строка — дата, голос, разобрать */
+  .entry { margin-bottom: 22px; }
+  .entry-label { font-size: 15px; }
+  #text { font-size: 17px; min-height: 52px; }
+  .entry-line { gap: 8px; }
+  #date { flex: 1 1 0; min-width: 0; padding: 8px; font-size: 14px; }
+  #voice, #parse { padding: 9px 12px; font-size: 14px; }
+  #parse { margin-left: 0; }
+  .ai-note { display: none; }
+
+  /* Календарь без лишнего: сводка за месяц есть в «Куда ушли деньги» */
+  .cal-month { display: none; }
+  .cal-below { margin-top: 12px; gap: 16px; }
+  .cal-legend { font-size: 12px; gap: 6px 12px; }
+  .cal-weeks { display: flex; overflow-x: auto; gap: 14px; scrollbar-width: none; margin-top: 12px; }
+  .cal-weeks::-webkit-scrollbar { display: none; }
+  .cal-week { flex: none; min-width: 112px; }
+  .ledger-bar h2 { font-size: 20px; }
+  .ledger-actions { font-size: 13px; }
+
+  /* Справа → снизу: только главное */
+  .chart-panel { display: none; }
+  .bars:not(.all) > .bar:nth-child(n + 6) { display: none; }
+  .bars-more { display: inline-block; margin-top: 4px; }
+  .bar-meta { font-size: 12px; }
+  .main-col { gap: 28px; }
+  .side-col { gap: 28px; }
+}

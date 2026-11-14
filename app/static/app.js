@@ -294,6 +294,16 @@ function renderSummary(summary) {
       note || delta ? el("div", { class: "bar-meta" }, note, delta) : null,
     ));
   }
+  // На телефоне видны первые 5 категорий, остальные — по кнопке
+  if (expenses.length > 5) {
+    box.classList.remove("all");
+    const more = el("button", { type: "button", class: "link-btn bars-more" }, `Показать все (${expenses.length})`);
+    more.addEventListener("click", () => {
+      const all = box.classList.toggle("all");
+      more.textContent = all ? "Свернуть" : `Показать все (${expenses.length})`;
+    });
+    box.append(more);
+  }
 }
 
 // ---------- График расходов по дням ----------
@@ -783,7 +793,7 @@ function renderCalendarRange(sel, items) {
     byCat.set(r.category, c);
   }
   const days = new Set(expenses.map((r) => r.date)).size;
-  const panel = el("aside", { class: "cal-day", "aria-live": "polite" },
+  const panel = el("aside", { class: `cal-day${sel ? "" : " cal-month"}`, "aria-live": "polite" },
     el("div", { class: "cal-day-head" }, el("h3", {}, title), sel ? backToMonth() : null),
     el("p", { class: "cal-sub" }, items.length
       ? `${items.length} ${plural(items.length, "запись", "записи", "записей")}` +
@@ -1179,6 +1189,7 @@ async function logout() {
 function openAccount() {
   for (const id of ["pw-current", "pw-new", "pw-repeat", "del-password"]) $(id).value = "";
   $("account-email").textContent = state.user?.email || "";
+  $("account-install").hidden = $("install").hidden;
   $("del-confirm").checked = false;
   $("del-submit").disabled = true;
   for (const id of ["pw-note", "del-note"]) {
@@ -1323,6 +1334,9 @@ async function init() {
   const goTo = (node) => node.scrollIntoView({ behavior: "smooth", block: "start" });
   $("nav-review").addEventListener("click", () => goTo(document.querySelector(".review")));
   $("nav-debts").addEventListener("click", () => goTo($("debts")));
+  $("nav-account").addEventListener("click", openAccount);
+  $("account-logout").addEventListener("click", () => { $("account-dialog").close(); logout(); });
+  $("account-install").addEventListener("click", () => { $("account-dialog").close(); $("install").click(); });
   $("nav-limits").addEventListener("click", () => openLimits().catch((e) => setStatus(e.message, true)));
   for (const id of ["tab-calendar", "tab-table", "tab-list"]) {
     $(id).addEventListener("click", () => {
@@ -1350,7 +1364,9 @@ async function init() {
       if (state.summary) renderDailyChart(state.summary);
     }, 150);
   });
-  setView(["list", "calendar"].includes(storage.get("view")) ? storage.get("view") : "table");
+  const savedView = storage.get("view");
+  const defaultView = matchMedia("(max-width: 720px)").matches ? "calendar" : "table";
+  setView(["table", "list", "calendar"].includes(savedView) ? savedView : defaultView);
 
   $("auth-form").addEventListener("submit", submitAuth);
   $("auth-demo").addEventListener("click", async () => {
