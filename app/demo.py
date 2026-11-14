@@ -72,7 +72,9 @@ def _month_rows(user_id: int, first: date, last: date, rng: random.Random) -> li
         add(first.replace(day=10), "income", Decimal(150000), "зарплата: подработка")
     if last.day >= 22:
         add(first.replace(day=22), "income", Decimal(30000), "фриланс: сайт для кофейни")
-    if last.day >= 9:
+    if last.day >= 11:
+        add(first.replace(day=11), "savings", Decimal(25000), "на депозит")
+    if last.day >= 9 and first.month % 2 == 0:
         add(first.replace(day=9), "lend", Decimal(10000), "", "Айбек")
     if last.day >= 14:
         add(first.replace(day=14), "lend", Decimal(5000), "", "Дана")
@@ -82,7 +84,7 @@ def _month_rows(user_id: int, first: date, last: date, rng: random.Random) -> li
 
 
 def seed_demo(db: Session, today: date | None = None) -> User:
-    """Создаёт (или пересоздаёт) демо-пользователя с данными за прошлый и текущий месяц."""
+    """Создаёт (или пересоздаёт) демо-пользователя с данными за последние полгода."""
     today = today or date.today()
     user = db.scalar(select(User).where(User.email == DEMO_EMAIL))
     if user is None:
@@ -94,10 +96,20 @@ def seed_demo(db: Session, today: date | None = None) -> User:
     db.execute(delete(Budget).where(Budget.user_id == user.id))
 
     rng = random.Random(f"{today.year}-{today.month}")
-    this_first = today.replace(day=1)
-    prev_last = this_first - timedelta(days=1)
-    rows = _month_rows(user.id, prev_last.replace(day=1), prev_last, rng)
-    rows += _month_rows(user.id, this_first, today, rng)
+    # Полгода данных: текущий месяц по сегодняшний день и пять прошлых — чтобы был виден обзор года
+    rows: list[Transaction] = []
+    first = today.replace(day=1)
+    for _ in range(5):
+        first = (first - timedelta(days=1)).replace(day=1)
+    while first <= today:
+        next_first = (first + timedelta(days=32)).replace(day=1)
+        last = min(today, next_first - timedelta(days=1))
+        rows += _month_rows(user.id, first, last, rng)
+        first = next_first
+    # Один раз взял немного из накоплений
+    rows.append(Transaction(user_id=user.id, date=today.replace(day=1) - timedelta(days=20), amount=Decimal(15000),
+                            category="savings_out", kind="unsave", description="из накоплений на ремонт ноутбука",
+                            counterparty=None, raw_text="демо"))
     db.add_all(rows)
     db.add_all(Budget(user_id=user.id, category=c, monthly_limit=Decimal(v)) for c, v in LIMITS.items())
     db.commit()

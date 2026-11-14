@@ -422,3 +422,51 @@ def test_delete_debt_removes_all_its_records_only(make_client):
     assert {t["category"] for t in nov} == {"lend", "transport"}  # такси и Дана на месте
     assert alice.request("DELETE", "/api/debts", params={"person": "Айбек"}).status_code == 404
     assert bob.get("/api/debts").json()[0]["person"] == "Айбек"  # чужой долг не тронут
+
+
+def test_savings_change_balance_and_total(make_client):
+    c = make_client()
+    c.post("/api/auth/register", json={"email": "s@kz.kz", "password": "password123"})
+    c.post("/api/transactions", json={"items": [
+        {"date": "2026-10-05", "amount": 100000, "category": "income"},
+        {"date": "2026-10-06", "amount": 20000, "category": "savings", "description": "на депозит"},
+        {"date": "2026-11-01", "amount": 150000, "category": "income"},
+        {"date": "2026-11-02", "amount": 30000, "category": "savings"},
+        {"date": "2026-11-03", "amount": 5000, "category": "savings_out", "description": "из копилки"},
+        {"date": "2026-11-03", "amount": 4000, "category": "transport"},
+    ]})
+    s = c.get("/api/summary", params={"month": "2026-11"}).json()
+    assert s["saved"] == 25000
+    assert s["savings_total"] == 45000
+    assert s["expense"] == 4000  # отложенное — не расход
+    assert s["balance"] == 150000 - 4000 - 25000
+
+
+def test_year_overview(make_client):
+    c = make_client()
+    c.post("/api/auth/register", json={"email": "y@kz.kz", "password": "password123"})
+    c.post("/api/transactions", json={"items": [
+        {"date": "2025-12-10", "amount": 3000, "category": "transport"},
+        {"date": "2026-02-10", "amount": 1000, "category": "transport"},
+        {"date": "2026-02-11", "amount": 5000, "category": "products"},
+        {"date": "2026-03-01", "amount": 90000, "category": "income"},
+        {"date": "2026-03-02", "amount": 10000, "category": "savings"},
+        {"date": "2026-03-05", "amount": 7000, "category": "lend", "counterparty": "Дана"},
+    ]})
+    y = c.get("/api/year", params={"year": 2026}).json()
+    assert len(y["months"]) == 12
+    feb, mar = y["months"][1], y["months"][2]
+    assert feb["expense"] == 6000 and mar["income"] == 90000 and mar["saved"] == 10000 and mar["lent"] == 7000
+    assert [cat["category"] for cat in y["categories"]] == ["products", "transport"]
+    assert y["categories"][1]["prev_total"] == 3000
+    assert y["prev_expense"] == 3000 and y["first_year"] == 2025 and y["savings_total"] == 10000
+
+
+def test_delete_debt_returns_items_for_undo(make_client):
+    c = make_client()
+    c.post("/api/auth/register", json={"email": "u@kz.kz", "password": "password123"})
+    c.post("/api/transactions", json={"items": [{"date": "2026-11-01", "amount": 500, "category": "lend", "counterparty": "Дана"}]})
+    r = c.request("DELETE", "/api/debts", params={"person": "Дана"}).json()
+    assert r["items"][0]["counterparty"] == "Дана"
+    c.post("/api/transactions", json={"items": r["items"]})  # «Вернуть»
+    assert c.get("/api/debts").json()[0]["balance"] == 500

@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app import parser
 from app.auth import get_current_user
 from app.auth import router as auth_router
-from app.categories import CATEGORIES, EXPENSE, KINDS, PERSON_KINDS, kind_of, normalize_category
+from app.categories import CATEGORIES, EXPENSE, KINDS, PERSON_KINDS, SAVE, UNSAVE, kind_of, normalize_category
 from app.config import settings
 from app.database import get_db
 from app.excel import build_workbook
@@ -44,6 +44,9 @@ from app.schemas import (
     Summary,
     TransactionOut,
     TransactionUpdate,
+    YearCategory,
+    YearMonth,
+    YearOverview,
 )
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -348,19 +351,81 @@ def summary(
     expense = by_kind.get(EXPENSE, 0.0)
     lent = by_kind.get("lend", 0.0)
     repaid = by_kind.get("repaid", 0.0)
+    saved = round(by_kind.get(SAVE, 0.0) - by_kind.get(UNSAVE, 0.0), 2)
     return Summary(
         month=month,
         income=income,
         expense=expense,
         lent=lent,
         repaid=repaid,
-        balance=round(income - expense - lent + repaid, 2),
+        saved=saved,
+        savings_total=_savings_total(db, user.id),
+        balance=round(income - expense - lent + repaid - saved, 2),
         by_category=by_category,
         by_day=list(days.values()),
         prev_month=prev_start.strftime("%Y-%m"),
         compare_days=compare_days,
         expense_to_date=sum(cur_by_cat.values()),
         prev_expense=sum(prev_by_cat.values()),
+    )
+
+
+def _savings_total(db: Session, user_id: int) -> float:
+    """Сколько всего лежит в накоплениях: всё отложенное минус всё взятое обратно."""
+    sums = _sum_by(db, Transaction.kind, Transaction.user_id == user_id, Transaction.kind.in_([SAVE, UNSAVE]))
+    return round(sums.get(SAVE, 0.0) - sums.get(UNSAVE, 0.0), 2)
+
+
+# ---------- Обзор года ----------
+
+@app.get("/api/year", response_model=YearOverview)
+def year_overview(
+    year: int | None = Query(default=None, ge=2000, le=2100),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Итоги по месяцам года и категории за год (со сравнением с прошлым годом)."""
+    year = year or date.today().year
+    mine = Transaction.user_id == user.id
+    month_col = func.extract("month", Transaction.date)
+    rows = db.execute(
+        select(month_col, Transaction.kind, func.sum(Transaction.amount))
+        .where(mine, Transaction.date >= date(year, 1, 1), Transaction.date < date(year + 1, 1, 1))
+        .group_by(month_col, Transaction.kind)
+    ).all()
+    months = {m: YearMonth(month=f"{year}-{m:02d}", income=0, expense=0, saved=0, lent=0, repaid=0) for m in range(1, 13)}
+    for m, kind, total in rows:
+        entry, value = months[int(m)], float(total or 0)
+        if kind == "income":
+            entry.income += value
+        elif kind == EXPENSE:
+            entry.expense += value
+        elif kind == "lend":
+            entry.lent += value
+        elif kind == "repaid":
+            entry.repaid += value
+        elif kind == SAVE:
+            entry.saved += value
+        elif kind == UNSAVE:
+            entry.saved -= value
+    expense_only = Transaction.kind == EXPENSE
+    this_year = _sum_by(db, Transaction.category, mine, expense_only,
+                        Transaction.date >= date(year, 1, 1), Transaction.date < date(year + 1, 1, 1))
+    last_year = _sum_by(db, Transaction.category, mine, expense_only,
+                        Transaction.date >= date(year - 1, 1, 1), Transaction.date < date(year, 1, 1))
+    categories = sorted(
+        (YearCategory(category=c, name=CATEGORIES.get(c, CATEGORIES["other"])[0], total=t, prev_total=last_year.get(c, 0.0))
+         for c, t in this_year.items()),
+        key=lambda c: -c.total,
+    )
+    first = db.scalar(select(func.min(Transaction.date)).where(mine))
+    return YearOverview(
+        year=year,
+        months=[months[m] for m in range(1, 13)],
+        categories=categories,
+        prev_expense=round(sum(last_year.values()), 2),
+        savings_total=_savings_total(db, user.id),
+        first_year=first.year if first else None,
     )
 
 
@@ -404,10 +469,16 @@ def delete_debt(
     doomed = [r for r in rows if ((r.counterparty or "").strip() or "Без имени").casefold() == key]
     if not doomed:
         raise HTTPException(404, "Такого долга нет")
+    # Возвращаем удалённые записи, чтобы на сайте можно было нажать «Вернуть»
+    items = [
+        {"date": r.date.isoformat(), "amount": float(r.amount), "category": r.category,
+         "description": r.description or "", "counterparty": r.counterparty}
+        for r in doomed
+    ]
     for row in doomed:
         db.delete(row)
     db.commit()
-    return {"deleted": len(doomed)}
+    return {"deleted": len(doomed), "items": items}
 
 
 # ---------- Разбор месяца ----------

@@ -30,9 +30,13 @@ def guess_category(text: str) -> str:
     words = [w.lower() for w in WORD_RE.findall(text)]
     if words and words[0] == "от":
         return "income"  # «10000 от брата»
+    joined = " ".join(words)
     for category, keys in KEYWORDS.items():
+        # Ключи из нескольких слов («из копилк») ищем во всей фразе, остальные — по началу слова
+        if any(" " in key and key in joined for key in keys):
+            return category
         for word in words:
-            if any(word.startswith(key) for key in keys):
+            if any(" " not in key and word.startswith(key) for key in keys):
                 return category
     return DEFAULT_CATEGORY
 

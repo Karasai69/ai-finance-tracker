@@ -47,6 +47,7 @@
           <div><dt>Расходы</dt><dd id="sum-expense">0 ₸</dd></div>
           <div><dt>Дал в долг</dt><dd id="sum-lent">0 ₸</dd></div>
           <div id="repaid-box" hidden><dt>Вернули долг</dt><dd id="sum-repaid">0 ₸</dd></div>
+          <div id="saved-box" hidden><dt>Отложил</dt><dd id="sum-saved">0 ₸</dd></div>
         </dl>
       </section>
 
@@ -156,6 +157,19 @@
           <ul id="review-points" class="review-points" hidden></ul>
           <p id="review-source" class="review-source"></p>
         </section>
+
+        <section id="savings" class="savings" aria-labelledby="savings-title">
+          <div class="savings-card">
+            <div>
+              <h2 id="savings-title">Накопления</h2>
+              <p class="savings-hint">Чтобы записать, напишите «отложил 20 000» или «взял из накоплений 5 000».</p>
+            </div>
+            <dl class="savings-nums">
+              <div><dt>Всего</dt><dd id="savings-total">0 ₸</dd></div>
+              <div><dt id="savings-month-label">В этом месяце</dt><dd id="savings-month">0 ₸</dd></div>
+            </dl>
+          </div>
+        </section>
       </div>
 
       <aside class="side-col">
@@ -165,6 +179,18 @@
             <button type="button" id="open-limits" class="link-btn">Лимиты</button>
           </div>
           <div id="categories" class="bars"></div>
+        </section>
+
+        <section id="year" class="year" aria-labelledby="year-title">
+          <div class="section-head">
+            <h2 id="year-title">Обзор года</h2>
+            <span class="year-nav">
+              <button type="button" id="year-prev" class="month-arrow light" aria-label="Предыдущий год">‹</button>
+              <b id="year-label"></b>
+              <button type="button" id="year-next" class="month-arrow light" aria-label="Следующий год">›</button>
+            </span>
+          </div>
+          <div id="year-body"><p class="muted">Загружаю…</p></div>
         </section>
 
         <section id="debts" class="debts" aria-labelledby="debts-title">
@@ -183,6 +209,11 @@
     </div>
   </main>
   </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden>
+    <span id="toast-text"></span>
+    <button type="button" id="toast-undo" class="toast-undo">Вернуть</button>
   </div>
 
   <button type="button" id="fab" class="fab" aria-label="Добавить запись">+</button>

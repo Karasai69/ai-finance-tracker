@@ -104,6 +104,8 @@ class Summary(BaseModel):
     expense: float
     lent: float
     repaid: float
+    saved: float = 0  # отложил за месяц (за вычетом того, что взял из накоплений)
+    savings_total: float = 0  # всего в накоплениях за всё время
     balance: float
     by_category: list[CategoryTotal]
     by_day: list[DayTotal]
@@ -112,6 +114,31 @@ class Summary(BaseModel):
     compare_days: int | None  # None — сравниваются месяцы целиком
     expense_to_date: float
     prev_expense: float
+
+
+class YearMonth(BaseModel):
+    month: str
+    income: float
+    expense: float
+    saved: float
+    lent: float
+    repaid: float
+
+
+class YearCategory(BaseModel):
+    category: str
+    name: str
+    total: float
+    prev_total: float  # за прошлый год
+
+
+class YearOverview(BaseModel):
+    year: int
+    months: list[YearMonth]
+    categories: list[YearCategory]
+    prev_expense: float  # расходы за прошлый год
+    savings_total: float
+    first_year: int | None  # с какого года есть записи
 
 
 class Debt(BaseModel):

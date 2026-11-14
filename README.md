@@ -39,10 +39,13 @@ Since early 2026 I logged every expense by hand in Google Sheets: date, category
 - Balance, income, expenses, debts; comparison with the same days of the previous month — overall and per category
 - Per-category budgets with over-limit warnings
 - Who owes me what, across all months, with full or partial "paid back"
+- Savings: "put aside 20 000" / "took 5 000 from savings" — a separate running total that is neither income nor expense
+- Year overview: income, expenses and savings by month, the most and least expensive months, top categories vs. last year
 - "Month review" by the LLM: where the money went and realistic ways to save. The app computes every number; the model only phrases them, so it can't invent figures
 
 **Data and account**
 - Excel export (entries sheet + "by day" sheet) and import back
+- Undo after deleting an entry or a whole debt
 - Sign-up, password change (logs out other devices), account deletion with all data
 - One-click demo account, re-seeded on every login
 - Installable on a phone as a PWA

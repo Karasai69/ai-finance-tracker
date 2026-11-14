@@ -18,6 +18,20 @@ const state = {
 };
 
 const PERSON_KINDS = ["lend", "repaid"];
+// Всё, что не расход: подпись, знак и стиль
+const KIND_INFO = {
+  income: { label: "Доход", sign: "+" },
+  lend: { label: "Дал в долг", sign: "→ " },
+  repaid: { label: "Вернули долг", sign: "+" },
+  save: { label: "Отложил", sign: "→ " },
+  unsave: { label: "Взял из накоплений", sign: "+" },
+};
+const kindSign = (kind) => KIND_INFO[kind]?.sign || "";
+const kindLabel = (row) => {
+  const info = KIND_INFO[row.kind];
+  if (!info) return state.names[row.category] || row.category;
+  return row.counterparty ? `${info.label}: ${row.counterparty}` : info.label;
+};
 const isPersonKind = (category) => PERSON_KINDS.includes(state.kinds[category]);
 
 const fmt = (value) => Number(value).toLocaleString("ru-RU", { maximumFractionDigits: 2 });
@@ -247,6 +261,11 @@ function renderSummary(summary) {
   $("sum-lent").textContent = money(summary.lent);
   $("sum-repaid").textContent = money(summary.repaid);
   $("repaid-box").hidden = !summary.repaid;
+  $("sum-saved").textContent = money(summary.saved || 0);
+  $("saved-box").hidden = !summary.saved;
+  $("savings-total").textContent = money(summary.savings_total || 0);
+  $("savings-month").textContent = (summary.saved > 0 ? "+" : "") + money(summary.saved || 0);
+  $("savings-month-label").textContent = `В ${MONTHS_PREP[Number(summary.month.slice(5, 7)) - 1]}`;
   // Знак ₸ — отдельно, мельче и цветом охры, как номинал на купюре
   $("sum-balance").replaceChildren(fmt(summary.balance).replace("-", "−"), el("span", { class: "cur" }, "₸"));
   $("sum-balance").classList.toggle("negative", summary.balance < 0);
@@ -403,8 +422,8 @@ function debtRemover(debt) {
   yes.addEventListener("click", async () => {
     yes.disabled = true;
     try {
-      await api(`/api/debts?person=${encodeURIComponent(debt.person)}`, { method: "DELETE" });
-      setStatus(`Долг «${debt.person}» удалён`);
+      const result = await api(`/api/debts?person=${encodeURIComponent(debt.person)}`, { method: "DELETE" });
+      showUndo(`Долг «${debt.person}» удалён`, result.items);
       await refresh();
     } catch (error) {
       note.textContent = error.message;
@@ -575,6 +594,8 @@ function renderTable(rows) {
   const hasIncome = rows.some((r) => r.kind === "income");
   const hasLend = rows.some((r) => r.kind === "lend");
   const hasRepaid = rows.some((r) => r.kind === "repaid");
+  const hasSave = rows.some((r) => r.kind === "save");
+  const hasUnsave = rows.some((r) => r.kind === "unsave");
 
   // Суммы по дням
   const cells = new Map(); // "2026-11-04|transport" -> { total, notes[], rows[] }
@@ -606,6 +627,8 @@ function renderTable(rows) {
     hasIncome && { key: "income", title: "Доход", cls: "col-income" },
     hasLend && { key: "lend", title: "В долг", cls: "col-lend" },
     hasRepaid && { key: "repaid", title: "Вернули", cls: "col-income" },
+    hasSave && { key: "save", title: "Отложил", cls: "col-lend" },
+    hasUnsave && { key: "unsave", title: "Из накоплений", cls: "col-income" },
     ...expenseCats.map((key, i) => ({ key, title: state.names[key] || key, heat: true, cls: i === 0 ? "col-first-cat" : null })),
   ].filter(Boolean);
 
@@ -825,9 +848,9 @@ function showCalTip(cell, label, items) {
     rest ? el("div", { class: "cal-tip-row" }, el("i"), el("span", {}, `ещё ${lines.length - 6}`), el("span"), el("b", {}, money(rest))) : null,
     ...other.map((r) => el("div", { class: "cal-tip-row extra" },
       el("i", { class: "ring" }),
-      el("span", {}, r.kind === "income" ? "Доход" : r.kind === "repaid" ? `Вернул ${r.counterparty || ""}` : `В долг ${r.counterparty || ""}`),
+      el("span", {}, kindLabel(r)),
       el("span"),
-      el("b", { class: r.kind }, (r.kind === "income" || r.kind === "repaid" ? "+" : "") + money(r.amount)))),
+      el("b", { class: r.kind }, kindSign(r.kind) + money(r.amount)))),
   ].filter(Boolean));
   tip.hidden = false;
   const box = cell.getBoundingClientRect();
@@ -890,6 +913,7 @@ function renderCalendarRange(sel, items) {
   }
   const flows = [
     ["income", "Доходы", "+"], ["lend", "Дал в долг", "→ "], ["repaid", "Вернули долг", "+"],
+    ["save", "Отложил", "→ "], ["unsave", "Взял из накоплений", "+"],
   ].map(([kind, name, sign]) => {
     const list = items.filter((r) => r.kind === kind);
     if (!list.length) return null;
@@ -915,7 +939,7 @@ function renderCalendarDay(day, items) {
     spent ? el("p", { class: "cal-total" }, money(spent)) : null,
   );
   for (const row of items) {
-    const sign = row.kind === "income" || row.kind === "repaid" ? "+" : row.kind === "lend" ? "→ " : "";
+    const sign = kindSign(row.kind);
     panel.append(el("button", { type: "button", class: "cal-it", title: "Изменить запись", onclick: () => openEditor(label, [row]) },
       el("i", { style: `background:${CAL_COLOR[row.category] || "#c9d3cc"}` }),
       el("span", {}, row.counterparty || row.description || state.names[row.category],
@@ -968,7 +992,7 @@ function renderWeekTable(rows) {
   const lines = [
     ...cats.map((c) => ({ name: state.names[c] || c, rows: expense.filter((r) => r.category === c), heat: true })),
     { name: "Всего расходов", rows: expense, cls: "wk-sum" },
-    ...[["income", "Доходы"], ["lend", "Дал в долг"], ["repaid", "Вернули"]]
+    ...[["income", "Доходы"], ["lend", "Дал в долг"], ["repaid", "Вернули"], ["save", "Отложил"], ["unsave", "Из накоплений"]]
       .map(([k, name]) => ({ name, rows: rows.filter((r) => r.kind === k), cls: `wk-${k}` }))
       .filter((l) => l.rows.length),
   ];
@@ -1050,7 +1074,7 @@ function renderEditor() {
       yes.disabled = true;
       try {
         await api(`/api/transactions/${row.id}`, { method: "DELETE" });
-        setStatus("Запись удалена");
+        showUndo(`Запись «${what}» удалена`, [restorable(row)]);
         await refresh();
         renderEditor();
       } catch (error) {
@@ -1095,6 +1119,128 @@ function renderEditor() {
   }
 }
 
+// ---------- Обзор года ----------
+
+const MONTHS_SHORT = ["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
+
+async function loadYear() {
+  const year = state.year || Number(state.month.slice(0, 4));
+  state.year = year;
+  $("year-label").textContent = year;
+  try {
+    const data = await api(`/api/year?year=${year}`);
+    if (data.year !== state.year) return;
+    renderYear(data);
+  } catch (error) {
+    $("year-body").replaceChildren(el("p", { class: "muted" }, error.message));
+  }
+}
+
+function renderYear(data) {
+  const body = $("year-body");
+  const thisYear = new Date().getFullYear();
+  $("year-next").disabled = data.year >= thisYear;
+  $("year-prev").disabled = data.first_year ? data.year <= data.first_year : true;
+  const active = data.months.filter((m) => m.expense || m.income || m.saved);
+  if (!active.length) {
+    body.replaceChildren(el("p", { class: "muted" }, `За ${data.year} год записей нет.`));
+    return;
+  }
+  const sum = (key) => data.months.reduce((s, m) => s + m[key], 0);
+  const income = sum("income"), expense = sum("expense"), saved = sum("saved");
+  const withExpense = data.months.filter((m) => m.expense > 0);
+  // Текущий месяц ещё не закончился — в «самый экономный» его не берём
+  const nowMonth = todayISO().slice(0, 7);
+  const finished = withExpense.filter((m) => m.month < nowMonth);
+  const maxM = withExpense.reduce((a, b) => (b.expense > a.expense ? b : a), withExpense[0]);
+  const minM = finished.length > 1 ? finished.reduce((a, b) => (b.expense < a.expense ? b : a), finished[0]) : null;
+  const avg = withExpense.length ? expense / withExpense.length : 0;
+  const change = data.prev_expense ? Math.round(((expense - data.prev_expense) / data.prev_expense) * 100) : null;
+
+  const tiles = el("dl", { class: "year-tiles" },
+    el("div", {}, el("dt", {}, "Доходы"), el("dd", { class: "income" }, money(income))),
+    el("div", {}, el("dt", {}, "Расходы"), el("dd", {}, money(expense)),
+      change !== null ? el("small", {}, `${change > 0 ? "▲" : "▼"} ${Math.abs(change)}% к ${data.year - 1}`) : null),
+    el("div", {}, el("dt", {}, "Отложено"), el("dd", { class: "save" }, money(saved))),
+    el("div", {}, el("dt", {}, "В среднем в месяц"), el("dd", {}, money(Math.round(avg)))),
+  );
+
+  const max = Math.max(1, ...data.months.map((m) => Math.max(m.expense, m.income)));
+  const first = data.months.findIndex((m) => m.expense || m.income || m.saved);
+  const last = data.months.length - 1 - [...data.months].reverse().findIndex((m) => m.expense || m.income || m.saved);
+  const list = el("div", { class: "year-months", role: "list" });
+  for (const m of data.months.slice(first, last + 1)) {
+    const idx = Number(m.month.slice(5, 7)) - 1;
+    const tag = m === maxM && withExpense.length > 1 ? el("span", { class: "ym-tag hot" }, "больше всего трат")
+      : m === minM ? el("span", { class: "ym-tag cool" }, "самый экономный") : null;
+    const row = el("button", { type: "button", class: "ym-row", role: "listitem",
+      title: `Открыть ${MONTHS_PREP[idx]} в календаре`,
+      onclick: () => { setMonth(m.month); setScreen("home"); } },
+      el("span", { class: "ym-name" }, MONTHS_SHORT[idx]),
+      el("span", { class: "ym-bars" },
+        el("span", { class: "ym-bar expense", style: `width:${((m.expense / max) * 100).toFixed(1)}%` }),
+        el("span", { class: "ym-bar income", style: `width:${((m.income / max) * 100).toFixed(1)}%` })),
+      el("span", { class: "ym-nums" },
+        el("b", {}, m.expense ? money(m.expense) : "—"),
+        el("small", {}, [m.income ? `+${money(m.income)}` : "", m.saved ? `отложил ${money(m.saved)}` : ""].filter(Boolean).join(" · ")),
+        tag),
+    );
+    list.append(row);
+  }
+  const legend = el("p", { class: "ym-legend" },
+    el("span", {}, el("i", { class: "expense" }), "расходы"), el("span", {}, el("i", { class: "income" }), "доходы"),
+    "Нажмите на месяц, чтобы открыть его в календаре.");
+
+  const top = data.categories.slice(0, 6);
+  const cats = el("div", { class: "year-cats" }, el("h3", {}, "Куда ушли деньги за год"),
+    ...top.map((c) => {
+      const delta = c.prev_total ? Math.round(((c.total - c.prev_total) / c.prev_total) * 100) : null;
+      return el("div", { class: "yc-row" },
+        el("span", {}, c.name),
+        el("span", { class: "yc-share" }, el("span", { style: `width:${((c.total / expense) * 100).toFixed(1)}%` })),
+        el("b", {}, money(c.total)),
+        el("small", {}, `${Math.round((c.total / expense) * 100)}%` + (delta !== null ? ` · ${delta > 0 ? "▲" : "▼"}${Math.abs(delta)}%` : "")));
+    }));
+
+  body.replaceChildren(tiles, el("div", { class: "year-grid" }, el("div", {}, list, legend), cats));
+}
+
+// ---------- «Вернуть» после удаления ----------
+
+let toastTimer = null;
+let toastUndo = null;
+
+function showUndo(text, items) {
+  toastUndo = items;
+  $("toast-text").textContent = text;
+  $("toast-undo").hidden = !items?.length;
+  $("toast").hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, 10000);
+}
+
+function hideToast() {
+  $("toast").hidden = true;
+  toastUndo = null;
+}
+
+async function undoDelete() {
+  const items = toastUndo;
+  if (!items) return;
+  hideToast();
+  try {
+    await api("/api/transactions", { method: "POST", body: JSON.stringify({ items }) });
+    setStatus(items.length > 1 ? `Вернул ${items.length} записи` : "Запись возвращена");
+    await refresh();
+    if (document.body.dataset.screen === "stats") loadYear();
+  } catch (error) {
+    setStatus(error.message, true);
+  }
+}
+
+const restorable = (row) => ({ date: row.date, amount: row.amount, category: row.category,
+  description: row.description || "", counterparty: row.counterparty || null });
+
 // ---------- Экраны и кнопка «Назад» ----------
 // У каждого экрана свой адрес (#calendar, #table, #stats, #debts) в истории браузера:
 // кнопка или жест «назад» возвращает на прошлый экран, а не уводит с сайта.
@@ -1119,6 +1265,7 @@ function setScreen(screen, history = "push") {
     for (const name of ["table", "calendar"]) $(`view-${name}`).hidden = view !== name;
   }
   document.body.dataset.screen = screen;
+  if (screen === "stats" && changed) loadYear();
   const tabs = { "tab-calendar": "home", "tab-table": "table", "nav-review": "stats", "nav-debts": "debts" };
   for (const [id, name] of Object.entries(tabs)) $(id).setAttribute("aria-selected", screen === name ? "true" : "false");
   const hash = SCREEN_HASH[screen];
@@ -1171,6 +1318,7 @@ async function refresh() {
     renderTable(rows);
     renderWeekTable(rows);
     renderCalendar(rows);
+    if (document.body.dataset.screen === "stats") loadYear();
   } catch (error) {
     setStatus(error.message, true);
   }
@@ -1585,6 +1733,9 @@ async function init() {
   $("tab-table").addEventListener("click", () => setView("table"));
   $("tab-calendar").addEventListener("click", () => setView("calendar"));
   $("back").addEventListener("click", goBack);
+  $("toast-undo").addEventListener("click", undoDelete);
+  $("year-prev").addEventListener("click", () => { state.year -= 1; loadYear(); });
+  $("year-next").addEventListener("click", () => { state.year += 1; loadYear(); });
   const goTo = (node) => node.scrollIntoView({ behavior: "smooth", block: "start" });
   $("nav-review").addEventListener("click", () => setScreen("stats"));
   $("fab").addEventListener("click", () => {

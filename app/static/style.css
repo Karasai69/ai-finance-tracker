@@ -781,3 +781,88 @@ body:not([data-screen="home"]) .day-stats { display: none; }
   .day-stats div { text-align: left; }
   .day-stats dd { font-size: 15px; }
 }
+
+/* ---------- Накопления, обзор года, «Вернуть» ---------- */
+.savings, .year { display: none; }
+body[data-screen="stats"] .savings, body[data-screen="stats"] .year { display: block; }
+.savings-card {
+  display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap;
+  padding: 18px 20px; border-radius: 4px; background: linear-gradient(100deg, #4a1524, #6b1f33); color: var(--note-text);
+}
+.savings-card h2 { color: #fff; }
+.savings-hint { margin: 4px 0 0; font-size: 13.5px; color: var(--note-muted); }
+.savings-nums { display: flex; gap: 32px; margin: 0; }
+.savings-nums dt { font-size: 13px; color: var(--note-muted); }
+.savings-nums dd { margin: 0; font: 700 26px var(--num); color: #fff; white-space: nowrap; }
+.savings-nums div:last-child dd { font-size: 20px; color: var(--ochre-light); }
+
+.year { margin-top: 10px; }
+.year-nav { display: inline-flex; align-items: center; gap: 10px; font: 700 18px var(--num); }
+.month-arrow.light { border-color: var(--rule); color: var(--ink); }
+.month-arrow.light:hover { background: var(--teal-wash); }
+.month-arrow.light:disabled { opacity: .35; cursor: default; }
+.year-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 14px 0 22px; }
+.year-tiles div { background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px; padding: 12px 14px; }
+.year-tiles dt { font-size: 13px; color: var(--muted); }
+.year-tiles dd { margin: 2px 0 0; font: 700 20px var(--num); white-space: nowrap; }
+.year-tiles dd.income { color: var(--teal-2); }
+.year-tiles dd.save { color: var(--ochre); }
+.year-tiles small { font-size: 12px; color: var(--muted); }
+.year-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 36px; align-items: start; }
+.year-months { display: grid; gap: 2px; }
+.ym-row {
+  display: grid; grid-template-columns: 38px minmax(0, 1fr) 190px; gap: 12px; align-items: center;
+  padding: 7px 6px; border: 0; border-radius: 4px; background: none; font: inherit; color: var(--ink); text-align: left; cursor: pointer;
+}
+.ym-row:hover { background: var(--teal-wash); }
+.ym-name { font-weight: 600; font-size: 14px; }
+.ym-bars { display: grid; gap: 3px; }
+.ym-bar { display: block; height: 7px; border-radius: 2px; min-width: 2px; }
+.ym-bar.expense { background: var(--teal); }
+.ym-bar.income { background: #8fb7a3; height: 4px; }
+.ym-nums { display: grid; justify-items: end; line-height: 1.25; }
+.ym-nums b { font: 700 15px var(--num); }
+.ym-nums small { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.ym-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 9px; margin-top: 2px; }
+.ym-tag.hot { background: rgba(178, 58, 42, .12); color: var(--brick); }
+.ym-tag.cool { background: rgba(47, 107, 79, .14); color: var(--teal-2); }
+.ym-legend { display: flex; gap: 14px; flex-wrap: wrap; margin: 10px 0 0; font-size: 12.5px; color: var(--muted); }
+.ym-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.ym-legend i { display: inline-block; width: 14px; height: 6px; border-radius: 2px; }
+.ym-legend i.expense { background: var(--teal); }
+.ym-legend i.income { background: #8fb7a3; }
+.year-cats h3 { margin: 0 0 10px; font-family: var(--display); font-size: 17px; }
+.yc-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "n v" "bar bar" "m m"; gap: 3px 10px; margin-bottom: 12px; font-size: 14px; }
+.yc-row > span:first-child { grid-area: n; }
+.yc-row b { grid-area: v; font: 700 14px var(--num); }
+.yc-share { grid-area: bar; height: 4px; background: var(--rule); border-radius: 2px; overflow: hidden; }
+.yc-share span { display: block; height: 100%; background: var(--teal); }
+.yc-row small { grid-area: m; font-size: 12px; color: var(--muted); }
+.muted { color: var(--muted); }
+
+/* «Вернуть» — плашка внизу экрана */
+.toast {
+  position: fixed; z-index: 60; left: 50%; bottom: 24px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 16px; padding: 12px 14px 12px 18px; border-radius: 6px;
+  background: var(--ink); color: #fbf8f1; font-size: 14.5px; box-shadow: 0 12px 28px -10px rgba(42, 20, 24, .55);
+  max-width: calc(100vw - 24px);
+}
+.toast[hidden] { display: none; }
+.toast-undo { border: 0; background: none; color: var(--ochre-light); font: 700 14.5px var(--body); cursor: pointer; padding: 4px 6px; white-space: nowrap; }
+.toast-undo:hover { text-decoration: underline; }
+
+/* Типы «отложил / из накоплений» в подсказках и списках */
+.cal-tip-row b.save, .cal-it b.save { color: var(--ochre); }
+.cal-tip-row b.unsave, .cal-it b.unsave { color: var(--teal-2); }
+.weeks-table tr.wk-save td { color: var(--ochre); }
+.weeks-table tr.wk-unsave td { color: var(--teal-2); }
+
+@media (max-width: 720px) {
+  .savings-nums dd { font-size: 22px; }
+  .year-tiles { grid-template-columns: 1fr 1fr; }
+  .year-grid { grid-template-columns: 1fr; gap: 24px; }
+  .ym-row { grid-template-columns: 34px minmax(0, 1fr) 132px; gap: 8px; }
+  .ym-nums small { white-space: normal; text-align: right; }
+  .toast { bottom: calc(76px + env(safe-area-inset-bottom)); }
+  .year-nav { font-size: 16px; }
+}

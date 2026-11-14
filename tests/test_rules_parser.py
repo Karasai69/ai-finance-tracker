@@ -75,3 +75,8 @@ def test_lend_and_repaid_get_person():
         ("lend", 10000, "Султан"),
         ("repaid", 5000, "Алижан"),
     ]
+
+
+def test_savings_keywords():
+    items, _ = parse("отложил 20 000, из копилки 5000")
+    assert items == [("savings", 20000, "save"), ("savings_out", 5000, "unsave")]
