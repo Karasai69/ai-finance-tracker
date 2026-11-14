@@ -647,7 +647,11 @@ function renderCalendar(rows) {
       "aria-label": `${label}: ${spent ? money(spent) : "нет расходов"}`,
       "aria-pressed": day === state.calDay ? "true" : "false",
       style: spent ? `--h:${(0.04 + (spent / max) * 0.2).toFixed(3)}` : null,
-      onclick: () => { state.calDay = day; renderCalendar(state.rows); },
+      onclick: () => { hideCalTip(); state.calDay = day; renderCalendar(state.rows); },
+      onmouseenter: (e) => showCalTip(e.currentTarget, label, items),
+      onmouseleave: hideCalTip,
+      onfocus: (e) => showCalTip(e.currentTarget, label, items),
+      onblur: hideCalTip,
     },
       el("span", { class: "cal-n" }, d),
       spent >= Math.max(15000, avg * 2.5) && totals.length > 3 ? el("span", { class: "cal-big" }, "крупная") : null,
@@ -682,6 +686,53 @@ function renderCalendar(rows) {
   box.append(grid, el("div", { class: "cal-below" },
     renderCalendarDay(byDay.get(state.calDay) || []),
     el("div", { class: "cal-aside" }, legend, weekBox)));
+}
+
+// Подсказка при наведении: на что ушли деньги в этот день
+function showCalTip(cell, label, items) {
+  if (!items.length || matchMedia("(hover: none)").matches) return; // на телефоне хватает списка под календарём
+  let tip = $("cal-tip");
+  if (!tip) {
+    tip = el("div", { id: "cal-tip", class: "cal-tip", role: "tooltip" });
+    document.body.append(tip);
+  }
+  const byCat = new Map();
+  for (const r of items.filter((r) => r.kind === "expense")) byCat.set(r.category, (byCat.get(r.category) || 0) + r.amount);
+  const spent = [...byCat.values()].reduce((a, b) => a + b, 0);
+  const lines = [...byCat].sort((a, b) => b[1] - a[1]);
+  const shown = lines.slice(0, 6);
+  const rest = lines.slice(6).reduce((s, [, v]) => s + v, 0);
+  const other = items.filter((r) => r.kind !== "expense");
+
+  tip.replaceChildren(...[
+    el("div", { class: "cal-tip-head" }, el("span", {}, label), spent ? el("b", {}, money(spent)) : null),
+    ...shown.map(([cat, sum]) => el("div", { class: "cal-tip-row" },
+      el("i", { style: `background:${CAL_COLOR[cat] || "#c9d3cc"}` }),
+      el("span", {}, state.names[cat] || cat),
+      el("span", { class: "cal-tip-bar" }, el("span", { style: `width:${Math.max(4, (sum / spent) * 100).toFixed(0)}%` })),
+      el("b", {}, money(sum)))),
+    rest ? el("div", { class: "cal-tip-row" }, el("i"), el("span", {}, `ещё ${lines.length - 6}`), el("span"), el("b", {}, money(rest))) : null,
+    ...other.map((r) => el("div", { class: "cal-tip-row extra" },
+      el("i", { class: "ring" }),
+      el("span", {}, r.kind === "income" ? "Доход" : r.kind === "repaid" ? `Вернул ${r.counterparty || ""}` : `В долг ${r.counterparty || ""}`),
+      el("span"),
+      el("b", { class: r.kind }, (r.kind === "income" || r.kind === "repaid" ? "+" : "") + money(r.amount)))),
+  ].filter(Boolean));
+  tip.hidden = false;
+  const box = cell.getBoundingClientRect();
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let left = box.left + box.width / 2 - w / 2;
+  left = Math.min(Math.max(8, left), window.innerWidth - w - 8);
+  let top = box.top - h - 8;
+  tip.classList.toggle("below", top < 8);
+  if (top < 8) top = box.bottom + 8;
+  tip.style.left = `${left + window.scrollX}px`;
+  tip.style.top = `${top + window.scrollY}px`;
+}
+
+function hideCalTip() {
+  const tip = $("cal-tip");
+  if (tip) tip.hidden = true;
 }
 
 function renderCalendarDay(items) {

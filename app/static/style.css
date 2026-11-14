@@ -434,6 +434,27 @@ input, select, textarea { border-radius: 2px; }
 .cal-it b.lend { color: var(--ochre); }
 .cal-add { margin-top: 14px; }
 
+.cal-tip {
+  position: absolute; z-index: 50; min-width: 250px; max-width: 320px; pointer-events: none;
+  background: var(--ink); color: #eef1ec; border-radius: 6px; padding: 10px 12px 8px;
+  box-shadow: 0 10px 28px rgba(10, 32, 32, .28); font-size: 13px;
+}
+.cal-tip-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline;
+  padding-bottom: 7px; margin-bottom: 4px; border-bottom: 1px solid rgba(255, 255, 255, .15); }
+.cal-tip-head span { color: #bfd3cf; }
+.cal-tip-head span::first-letter { text-transform: uppercase; }
+.cal-tip-head b { font: 700 16px var(--num); color: #fff; }
+.cal-tip-row { display: grid; grid-template-columns: 8px minmax(0, 1fr) 46px auto; gap: 8px; align-items: center; padding: 3px 0; }
+.cal-tip-row i { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(255, 255, 255, .35); }
+.cal-tip-row i.ring { background: transparent; border: 1.5px solid var(--ochre-light); box-shadow: none; }
+.cal-tip-row span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-tip-bar { height: 4px; background: rgba(255, 255, 255, .12); border-radius: 2px; }
+.cal-tip-bar span { display: block; height: 100%; background: var(--ochre-light); border-radius: 2px; }
+.cal-tip-row b { font: 600 13px var(--num); text-align: right; white-space: nowrap; }
+.cal-tip-row.extra { margin-top: 2px; }
+.cal-tip-row b.income, .cal-tip-row b.repaid { color: #9fd6c6; }
+.cal-tip-row b.lend { color: var(--ochre-light); }
+
 @media (max-width: 720px) {
   .cal-below { grid-template-columns: 1fr; gap: 24px; }
   .cal-aside { order: -1; }
