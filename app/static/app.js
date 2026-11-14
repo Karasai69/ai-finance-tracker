@@ -1022,30 +1022,68 @@ function setupVoice() {
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!Recognition) return;
   const button = $("voice");
+  const text = $("text");
   button.hidden = false;
-  const recognition = new Recognition();
-  recognition.lang = "ru-RU";
-  recognition.interimResults = false;
-  let listening = false;
 
-  recognition.onresult = (event) => {
-    const said = Array.from(event.results).map((r) => r[0].transcript).join(" ");
-    const current = $("text").value.trim();
-    $("text").value = current ? `${current}, ${said}` : said;
+  // Слушаем, пока человек сам не нажмёт «Остановить»: паузы в речи запись не прерывают.
+  // Браузер всё равно иногда завершает распознавание сам — тогда тихо запускаем его заново.
+  let wanted = false;     // человек хочет, чтобы мы слушали
+  let before = "";        // текст в поле до начала записи
+  let heard = "";         // окончательно распознанное за эту запись
+  let recognition = null;
+
+  const join = (...parts) => parts.map((p) => p.trim()).filter(Boolean).join(", ");
+  const setButton = (on) => {
+    button.classList.toggle("listening", on);
+    button.textContent = on ? "■ Остановить" : "Голосом";
+    button.setAttribute("aria-pressed", String(on));
   };
-  recognition.onend = () => {
-    listening = false;
-    button.classList.remove("listening");
-    button.textContent = "Голосом";
-  };
-  recognition.onerror = (event) => setStatus("Голосовой ввод не сработал: " + event.error, true);
+
+  function startSession() {
+    recognition = new Recognition();
+    recognition.lang = "ru-RU";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.onresult = (event) => {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const piece = event.results[i][0].transcript;
+        if (event.results[i].isFinal) heard = join(heard, piece);
+        else interim += piece;
+      }
+      text.value = join(before, heard, interim); // промежуточный текст виден сразу
+    };
+    recognition.onerror = (event) => {
+      if (event.error === "no-speech" || event.error === "aborted") return; // тишина — не ошибка
+      wanted = false;
+      setStatus(event.error === "not-allowed"
+        ? "Разрешите доступ к микрофону в настройках браузера"
+        : "Голосовой ввод не сработал: " + event.error, true);
+    };
+    recognition.onend = () => {
+      if (wanted) {
+        try { startSession(); return; } catch (_) { wanted = false; }
+      }
+      text.value = join(before, heard);
+      setButton(false);
+      setStatus(heard ? "Готово — проверьте текст и нажмите «Разобрать»" : "");
+      if (heard) text.focus();
+    };
+    recognition.start();
+  }
 
   button.addEventListener("click", () => {
-    if (listening) return recognition.stop();
-    listening = true;
-    button.classList.add("listening");
-    button.textContent = "Остановить";
-    recognition.start();
+    if (wanted) {
+      wanted = false;
+      recognition?.stop();
+      return;
+    }
+    wanted = true;
+    before = text.value;
+    heard = "";
+    setButton(true);
+    setStatus("Слушаю… Говорите сколько нужно, потом нажмите «Остановить»");
+    try { startSession(); } catch (error) { wanted = false; setButton(false); setStatus(error.message, true); }
   });
 }
 
