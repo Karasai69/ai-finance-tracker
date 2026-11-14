@@ -34,7 +34,8 @@ Since early 2026 I logged every expense by hand in Google Sheets: date, category
 
 **Monthly overview**
 - Calendar: daily totals, heat shading, "big spend" badges, per-day breakdown on hover, summary for the month, a week or a day
-- Spreadsheet-style "days × categories" table and a plain list
+- Spreadsheet-style "days × categories" table (on phones: categories × weeks)
+- Separate screens: Calendar, Table, Summary, Debts — bottom tab bar on phones
 - Balance, income, expenses, debts; comparison with the same days of the previous month — overall and per category
 - Per-category budgets with over-limit warnings
 - Who owes me what, across all months, with full or partial "paid back"

@@ -89,7 +89,7 @@ h2 { font-size: 22px; margin: 0; }
 .rail-nav .tab[aria-selected="true"] {
   color: var(--note-text); font-weight: 600; background: rgba(220, 184, 102, .16); box-shadow: inset 3px 0 0 var(--ochre-light);
 }
-.nav-ico, .rail-nav .sm, #nav-account, .bars-more, .weeks-wrap, .fab { display: none; }
+.nav-ico, #nav-account, .weeks-wrap, .fab { display: none; }
 .account-quick { display: none; }
 .rosette { display: block; width: 130px; height: 130px; margin: 22px auto 0; flex: none; }
 @media (max-height: 860px) and (min-width: 901px) { .rosette { display: none; } .rail-nav { margin-top: 18px; } }
@@ -359,7 +359,7 @@ input, select, textarea { border-radius: 2px; }
 
 /* Планшет и телефон: панель становится шапкой сверху */
 @media (max-width: 900px) {
-  .shell { grid-template-columns: 1fr; }
+  .shell { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   .rail { position: relative; height: auto; overflow: hidden; }
   .rail-inner { padding: 16px 18px 14px; }
   .rail-top { grid-template-columns: auto 1fr; align-items: center; gap: 12px; }
@@ -554,7 +554,6 @@ input, select, textarea { border-radius: 2px; }
   .nav-ico { display: block; width: 22px; height: 22px; }
   .nav-ico svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   #nav-account { display: flex; }
-  #nav-debts, #nav-limits { display: none !important; }
   .rail-nav .lg { display: none; }
   .rail-nav .sm { display: inline; }
   .account-quick { display: flex; gap: 8px; padding: 12px 20px 0; flex-wrap: wrap; }
@@ -582,8 +581,6 @@ input, select, textarea { border-radius: 2px; }
 
   /* Справа → снизу: только главное */
   .chart-panel { display: none; }
-  .bars:not(.all) > .bar:nth-child(n + 6) { display: none; }
-  .bars-more { display: inline-block; margin-top: 4px; }
   .bar-meta { font-size: 12px; }
   .main-col { gap: 28px; }
   .side-col { gap: 28px; }
@@ -605,7 +602,7 @@ input, select, textarea { border-radius: 2px; }
   body[data-screen="table"] .side-col, body[data-screen="list"] .side-col { display: none; }
   /* Итоги: разбор месяца, категории, долги */
   body[data-screen="stats"] .entry, body[data-screen="stats"] .ledger { display: none; }
-  body[data-screen="stats"] .layout { display: flex; flex-direction: column-reverse; gap: 28px; }
+  body[data-screen="stats"] .layout { display: flex; flex-direction: column; gap: 28px; }
   body[data-screen="stats"] .main-col, body[data-screen="stats"] .side-col { display: grid; }
   /* на экранах без поля ввода — круглая кнопка «+» */
   body:not([data-screen="home"]) .fab { display: grid; }
@@ -670,4 +667,67 @@ input, select, textarea { border-radius: 2px; }
   .demo-actions .btn { width: 100%; }
   .demo-actions .icon-btn { position: absolute; top: 8px; right: 8px; }
   body:not([data-screen="home"]) .demo-banner { display: none; }
+}
+
+/* ---------- Экраны (компьютер и телефон) ---------- */
+.chart-panel { display: none; }
+.nav-badge { margin-left: auto; font: 600 12px var(--num); color: var(--ochre-light); }
+.rail-nav .tab { display: flex; align-items: center; gap: 8px; }
+
+/* Главная: ввод, календарь и коротко «куда ушли деньги» */
+body[data-screen="home"] .review, body[data-screen="home"] #debts { display: none; }
+body[data-screen="home"] .bars:not(.all) > .bar:nth-child(n + 7) { display: none; }
+.bars-more { display: none; margin-top: 4px; }
+body[data-screen="home"] .bars-more { display: inline-block; }
+body[data-screen="stats"] .bars > .bar { display: grid; }
+
+/* Таблица: на всю ширину */
+body[data-screen="table"] .review, body[data-screen="table"] .side-col { display: none; }
+body[data-screen="table"] .layout { grid-template-columns: minmax(0, 1fr); }
+
+/* Итоги: разбор месяца + все категории и лимиты */
+body[data-screen="stats"] .entry, body[data-screen="stats"] .ledger, body[data-screen="stats"] #debts { display: none; }
+
+/* Долги: отдельная страница */
+body[data-screen="debts"] .entry, body[data-screen="debts"] .main-col,
+body[data-screen="debts"] .categories { display: none; }
+body[data-screen="debts"] .layout { grid-template-columns: minmax(0, 760px); }
+body[data-screen="debts"] .debts h2 { font-size: 28px; }
+body[data-screen="debts"] .debts-total { font-size: 26px; }
+
+.debt { border: 1px solid var(--rule); border-left: 3px solid var(--ochre); background: var(--sheet); padding: 14px 16px; border-radius: 3px; }
+.debt::before { display: none; }
+.debt-main { grid-template-columns: auto 1fr auto auto; gap: 14px; }
+.debt-avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--wine); color: var(--ochre-light); font: 700 18px var(--display); }
+.debt-progress { height: 4px; background: var(--rule); border-radius: 2px; margin-top: 10px; overflow: hidden; }
+.debt-progress span { display: block; height: 100%; background: var(--teal-2); }
+.debts-empty { border: 1px dashed var(--rule); padding: 18px; border-radius: 3px; background: var(--sheet); }
+.debts-empty p { margin: 0; }
+.debts-empty .muted { color: var(--muted); font-size: 14px; margin-top: 4px; }
+.debts-closed-wrap { margin-top: 14px; }
+.debts-closed { margin-top: 8px; }
+.debt-closed { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--rule); color: var(--muted); font-size: 14px; }
+
+.data-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.data-actions .btn { padding: 8px 14px; font-size: 14px; text-decoration: none; }
+
+@media (max-width: 720px) {
+  .rail-nav .tab { justify-content: center; gap: 2px; }
+  .nav-badge { display: none; }
+  body[data-screen="stats"] .main-col, body[data-screen="stats"] .side-col { display: grid; }
+  body[data-screen="debts"] .layout { display: block; }
+  body[data-screen="debts"] .debts h2 { font-size: 22px; }
+  body[data-screen="debts"] .debts-total { font-size: 20px; }
+  .debt-main { grid-template-columns: auto 1fr auto; }
+  .debt-main .btn { grid-column: 1 / -1; justify-self: start; }
+  .debt-avatar { width: 34px; height: 34px; font-size: 16px; }
+}
+
+/* Сводка месяца под календарём повторяет «Куда ушли деньги» — показываем только день или неделю */
+.cal-month { display: none; }
+/* Итоги на компьютере: разбор сверху, категории в две колонки */
+@media (min-width: 721px) {
+  body[data-screen="stats"] .layout { grid-template-columns: minmax(0, 1fr); max-width: 980px; }
+  body[data-screen="stats"] .bars { display: grid; grid-template-columns: 1fr 1fr; column-gap: 44px; align-items: start; }
 }

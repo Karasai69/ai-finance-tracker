@@ -387,10 +387,17 @@ function renderDailyChart(summary) {
 
 function renderDebts() {
   const open = state.debts.filter((d) => d.balance > 0);
-  $("debts").hidden = open.length === 0;
-  $("debts-total").textContent = money(open.reduce((s, d) => s + d.balance, 0));
+  const closed = state.debts.filter((d) => d.balance <= 0);
+  const total = open.reduce((s, d) => s + d.balance, 0);
+  $("debts-total").textContent = total ? money(total) : "";
+  $("nav-debts-sum").textContent = total ? money(total).replace(" ₸", "") : "";
   const box = $("debts-list");
   box.replaceChildren();
+  if (!open.length) {
+    box.append(el("div", { class: "debts-empty" },
+      el("p", {}, "Сейчас вам никто не должен."),
+      el("p", { class: "muted" }, "Чтобы записать долг, напишите в поле ввода, например: «дал Айбеку в долг 5 000».")));
+  }
   for (const debt of open) {
     const since = new Date(debt.since + "T00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
     const form = el("div", { class: "repay", hidden: "" });
@@ -419,15 +426,27 @@ function renderDebts() {
       toggle.textContent = form.hidden ? "Вернул" : "Отмена";
       if (!form.hidden) amount.focus();
     });
+    const share = debt.lent ? Math.min(100, (debt.repaid / debt.lent) * 100) : 0;
     box.append(el("div", { class: "debt" },
       el("div", { class: "debt-main" },
+        el("span", { class: "debt-avatar", "aria-hidden": "true" }, debt.person.trim()[0]?.toUpperCase() || "?"),
         el("div", {}, el("b", {}, debt.person), el("div", { class: "debt-since" },
-          `с ${since}`, debt.repaid ? `, уже вернул ${money(debt.repaid)}` : "")),
+          `дал ${money(debt.lent)} · с ${since}`, debt.repaid ? ` · вернул ${money(debt.repaid)}` : "")),
         el("strong", { class: "lend" }, money(debt.balance)),
         toggle,
       ),
+      debt.repaid ? el("div", { class: "debt-progress", title: `Вернул ${Math.round(share)}%` },
+        el("span", { style: `width:${share.toFixed(1)}%` })) : null,
       form,
     ));
+  }
+  if (closed.length) {
+    const list = el("div", { class: "debts-closed", hidden: "" }, ...closed.map((d) =>
+      el("div", { class: "debt-closed" }, el("span", {}, d.person),
+        el("span", {}, `${money(d.lent)} — вернул полностью`))));
+    const toggle = el("button", { type: "button", class: "link-btn" }, `Закрытые долги (${closed.length})`);
+    toggle.addEventListener("click", () => { list.hidden = !list.hidden; });
+    box.append(el("div", { class: "debts-closed-wrap" }, toggle, list));
   }
 }
 
@@ -922,45 +941,6 @@ function renderWeekTable(rows) {
   box.append(table, el("p", { class: "weeks-hint" }, "Суммы по неделям месяца, «к» — тысячи. Нажмите на сумму, чтобы увидеть записи."));
 }
 
-// ---------- Список ----------
-
-function renderList(rows) {
-  const box = $("view-list");
-  box.replaceChildren();
-  if (!rows.length) {
-    box.append(el("p", { class: "empty" }, "В этом месяце записей нет. Добавьте первую в поле выше."));
-    return;
-  }
-  const byDay = new Map();
-  for (const row of rows) {
-    if (!byDay.has(row.date)) byDay.set(row.date, []);
-    byDay.get(row.date).push(row);
-  }
-  for (const [day, items] of byDay) {
-    const spent = items.filter((r) => r.kind === "expense").reduce((s, r) => s + r.amount, 0);
-    const label = new Date(day + "T00:00").toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "long" });
-    const group = el("div", { class: "day" },
-      el("div", { class: "day-head" }, el("span", {}, label), el("span", {}, spent ? "расходы " + money(spent) : "")),
-    );
-    for (const row of items) {
-      const sign = row.kind === "income" || row.kind === "repaid" ? "+" : "−";
-      group.append(el("div", { class: "tx" },
-        el("div", {},
-          el("div", {}, row.description || state.names[row.category]),
-          (row.description || "").toLowerCase() === (state.names[row.category] || "").toLowerCase() && !row.counterparty
-            ? null
-            : el("div", { class: "tx-cat" }, state.names[row.category] || row.category,
-              row.counterparty ? ` · ${row.counterparty}` : ""),
-        ),
-        el("span", { class: `tx-amount ${row.kind}` }, sign + money(row.amount)),
-        el("button", { type: "button", class: "icon-btn edit", title: "Изменить запись", "aria-label": "Изменить запись",
-          onclick: () => openEditor(label, [row]) }, "✎"),
-      ));
-    }
-    box.append(group);
-  }
-}
-
 // ---------- Окно редактирования ----------
 
 const editor = { title: "", ids: [] };
@@ -1041,11 +1021,8 @@ function renderEditor() {
 
 function setView(view) {
   state.view = view;
-  for (const name of ["table", "calendar", "list"]) {
-    $(`tab-${name}`).setAttribute("aria-selected", view === name);
-    $(`view-${name}`).hidden = view !== name;
-  }
-  setScreen({ calendar: "home", table: "table", list: "list" }[view]);
+  for (const name of ["table", "calendar"]) $(`view-${name}`).hidden = view !== name;
+  setScreen(view === "table" ? "table" : "home");
 }
 
 // На телефоне каждая вкладка внизу — отдельный экран (на компьютере всё на одной странице)
@@ -1053,9 +1030,9 @@ const isPhone = () => matchMedia("(max-width: 720px)").matches;
 
 function setScreen(screen) {
   document.body.dataset.screen = screen;
-  $("nav-review").setAttribute("aria-selected", screen === "stats" ? "true" : "false");
-  if (screen === "stats") for (const name of ["table", "calendar", "list"]) $(`tab-${name}`).setAttribute("aria-selected", "false");
-  if (isPhone()) window.scrollTo({ top: 0, behavior: "instant" });
+  const tabs = { "tab-calendar": "home", "tab-table": "table", "nav-review": "stats", "nav-debts": "debts" };
+  for (const [id, name] of Object.entries(tabs)) $(id).setAttribute("aria-selected", screen === name ? "true" : "false");
+  window.scrollTo({ top: 0, behavior: "instant" });
 }
 
 async function refresh() {
@@ -1068,14 +1045,13 @@ async function refresh() {
     ]);
     state.debts = debts;
     renderDebts();
-    $("nav-debts").hidden = $("debts").hidden;
+
     if (month !== state.month) return; // пока грузили, переключили месяц
     state.rows = rows;
     renderSummary(summary);
     renderTable(rows);
     renderWeekTable(rows);
     renderCalendar(rows);
-    renderList(rows);
   } catch (error) {
     setStatus(error.message, true);
   }
@@ -1414,24 +1390,18 @@ async function init() {
   $("prev-month").addEventListener("click", () => setMonth(shiftMonth(state.month, -1)));
   $("next-month").addEventListener("click", () => setMonth(shiftMonth(state.month, 1)));
   $("tab-table").addEventListener("click", () => setView("table"));
-  $("tab-list").addEventListener("click", () => setView("list"));
   $("tab-calendar").addEventListener("click", () => setView("calendar"));
   const goTo = (node) => node.scrollIntoView({ behavior: "smooth", block: "start" });
-  $("nav-review").addEventListener("click", () => (isPhone() ? setScreen("stats") : goTo(document.querySelector(".review"))));
+  $("nav-review").addEventListener("click", () => setScreen("stats"));
   $("fab").addEventListener("click", () => {
     setView("calendar");
     $("text").focus();
   });
-  $("nav-debts").addEventListener("click", () => goTo($("debts")));
+  $("nav-debts").addEventListener("click", () => setScreen("debts"));
   $("nav-account").addEventListener("click", openAccount);
   $("account-logout").addEventListener("click", () => { $("account-dialog").close(); logout(); });
   $("account-install").addEventListener("click", () => { $("account-dialog").close(); $("install").click(); });
-  $("nav-limits").addEventListener("click", () => openLimits().catch((e) => setStatus(e.message, true)));
-  for (const id of ["tab-calendar", "tab-table", "tab-list"]) {
-    $(id).addEventListener("click", () => {
-      if (!isPhone() && matchMedia("(max-width: 900px)").matches) goTo(document.querySelector(".ledger"));
-    });
-  }
+
   const grow = () => {
     const t = $("text");
     t.style.height = "auto";
@@ -1496,7 +1466,7 @@ async function init() {
   state.order = Object.fromEntries(data.categories.map((c, i) => [c.key, i]));
   state.kinds = Object.fromEntries(data.categories.map((c) => [c.key, c.kind]));
   $("ai-note").textContent = health.ai_enabled
-    ? "Текст разбирает ИИ: можно писать как угодно, например «вчера на такси ушло 300»."
+    ? ""
     : "ИИ не подключён: работает простой разбор. Пишите «категория сумма» через запятую.";
 
   try {

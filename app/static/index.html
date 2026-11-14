@@ -53,11 +53,9 @@
         <div role="tablist" aria-label="Вид записей" class="rail-tabs">
           <button type="button" role="tab" id="tab-calendar" class="tab" aria-selected="false"><i class="nav-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></i>Календарь</button>
           <button type="button" role="tab" id="tab-table" class="tab" aria-selected="true"><i class="nav-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 4.5v15"/></svg></i>Таблица</button>
-          <button type="button" role="tab" id="tab-list" class="tab" aria-selected="false"><i class="nav-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 7h12M8 12h12M8 17h12"/><circle cx="4.5" cy="7" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="17" r="1"/></svg></i>Список</button>
         </div>
-        <button type="button" id="nav-review" class="tab"><i class="nav-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l2.3 5.2 5.7.6-4.3 3.8 1.3 5.6L12 15.3 7 18.2l1.3-5.6L4 8.8l5.7-.6z"/></svg></i><span class="lg">Разбор месяца</span><span class="sm">Итоги</span></button>
-        <button type="button" id="nav-debts" class="tab" hidden>Долги</button>
-        <button type="button" id="nav-limits" class="tab">Лимиты</button>
+        <button type="button" id="nav-review" class="tab"><i class="nav-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l2.3 5.2 5.7.6-4.3 3.8 1.3 5.6L12 15.3 7 18.2l1.3-5.6L4 8.8l5.7-.6z"/></svg></i>Итоги</button>
+        <button type="button" id="nav-debts" class="tab"><i class="nav-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7.5h16v11H4z"/><path d="M4 11h16"/><circle cx="15.5" cy="15" r="1.2"/><path d="M7 4.5h10"/></svg></i>Долги <span id="nav-debts-sum" class="nav-badge"></span></button>
         <button type="button" id="nav-account" class="tab"><i class="nav-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c1.2-3.8 4-5.5 7.5-5.5s6.3 1.7 7.5 5.5"/></svg></i>Аккаунт</button>
       </nav>
 
@@ -141,16 +139,10 @@
           <div class="ledger-bar">
             <h2 id="ledger-title">Записи</h2>
             <span id="compare" class="compare-chip" hidden></span>
-            <div class="ledger-actions">
-              <button type="button" id="import" class="export link-btn" title="Файл Excel в формате выгрузки (подойдёт и CSV)">Загрузить из Excel</button>
-              <input type="file" id="import-file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden>
-              <a id="export" class="export" href="/api/export.xlsx">Скачать Excel</a>
-            </div>
           </div>
           <div id="view-table" class="table-wrap" tabindex="0" aria-label="Таблица расходов по дням"></div>
           <div id="view-weeks" class="weeks-wrap" aria-label="Расходы по категориям и неделям"></div>
           <div id="view-calendar" class="calendar" hidden></div>
-          <div id="view-list" class="list" hidden></div>
         </section>
 
         <section class="review" aria-labelledby="review-title">
@@ -173,7 +165,7 @@
           <div id="categories" class="bars"></div>
         </section>
 
-        <section id="debts" class="debts" aria-labelledby="debts-title" hidden>
+        <section id="debts" class="debts" aria-labelledby="debts-title">
           <div class="section-head">
             <h2 id="debts-title">Мне должны</h2>
             <strong id="debts-total" class="debts-total"></strong>
@@ -244,9 +236,19 @@
     <p class="account-email">Вы вошли как <strong id="account-email"></strong></p>
     <div class="account-quick">
       <button type="button" id="account-install" class="btn ghost">Установить приложение</button>
-      <a id="account-export" class="btn ghost" href="/api/export.xlsx?all=true" download>Скачать всё в Excel</a>
       <button type="button" id="account-logout" class="btn ghost">Выйти</button>
     </div>
+
+    <section class="account-section">
+      <h3>Данные в Excel</h3>
+      <p class="account-lead">Скачайте записи или загрузите файл в том же формате (подойдёт и CSV).</p>
+      <div class="data-actions">
+        <a id="export" class="btn ghost" href="/api/export.xlsx" download>Скачать месяц</a>
+        <a id="account-export" class="btn ghost" href="/api/export.xlsx?all=true" download>Скачать всё</a>
+        <button type="button" id="import" class="btn ghost">Загрузить из Excel</button>
+        <input type="file" id="import-file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden>
+      </div>
+    </section>
 
     <form id="password-form" class="account-section" novalidate>
       <h3>Сменить пароль</h3>
