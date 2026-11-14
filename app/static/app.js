@@ -854,6 +854,74 @@ function renderCalendarDay(day, items) {
   return panel;
 }
 
+// ---------- Таблица для телефона: категории × недели ----------
+
+function monthWeeks(month) {
+  const [y, m] = month.split("-").map(Number);
+  const days = new Date(y, m, 0).getDate();
+  const offset = (new Date(y, m - 1, 1).getDay() + 6) % 7;
+  const today = todayISO();
+  const weeks = [];
+  let start = 1;
+  for (let d = 1; d <= days; d++) {
+    if ((offset + d - 1) % 7 === 6 || d === days) {
+      const from = `${month}-${String(start).padStart(2, "0")}`;
+      if (from <= today) weeks.push({ from, to: `${month}-${String(d).padStart(2, "0")}`, label: start === d ? `${start}` : `${start}–${d}` });
+      start = d + 1;
+    }
+  }
+  return weeks;
+}
+
+function renderWeekTable(rows) {
+  const box = $("view-weeks");
+  box.replaceChildren();
+  if (!rows.length) {
+    box.append(el("p", { class: "empty" }, "В этом месяце записей нет."));
+    return;
+  }
+  const weeks = monthWeeks(state.month);
+  const monthGen = MONTHS_GEN[Number(state.month.slice(5, 7)) - 1];
+  const expense = rows.filter((r) => r.kind === "expense");
+  const totals = new Map();
+  for (const r of expense) totals.set(r.category, (totals.get(r.category) || 0) + r.amount);
+  const cats = [...totals.keys()].sort((a, b) => totals.get(b) - totals.get(a));
+  const inWeek = (r, w) => r.date >= w.from && r.date <= w.to;
+  const lines = [
+    ...cats.map((c) => ({ name: state.names[c] || c, rows: expense.filter((r) => r.category === c), heat: true })),
+    { name: "Всего расходов", rows: expense, cls: "wk-sum" },
+    ...[["income", "Доходы"], ["lend", "Дал в долг"], ["repaid", "Вернули"]]
+      .map(([k, name]) => ({ name, rows: rows.filter((r) => r.kind === k), cls: `wk-${k}` }))
+      .filter((l) => l.rows.length),
+  ];
+  const max = Math.max(1, ...cats.flatMap((c) => weeks.map((w) =>
+    expense.filter((r) => r.category === c && inWeek(r, w)).reduce((s, r) => s + r.amount, 0))));
+  const short = (v) => (v >= 10000 ? `${(v / 1000).toFixed(v >= 100000 ? 0 : 1).replace(".", ",").replace(/,0$/, "")}к` : fmt(v));
+
+  const table = el("table", { class: "weeks-table" },
+    el("thead", {}, el("tr", {}, el("th", { scope: "col" }, monthGen[0].toUpperCase() + monthGen.slice(1) + ", дни"),
+      ...weeks.map((w) => el("th", { scope: "col" }, w.label)), el("th", { scope: "col", class: "wk-total" }, "Итого"))),
+  );
+  const body = el("tbody");
+  for (const line of lines) {
+    const tr = el("tr", { class: line.cls || null }, el("th", { scope: "row" }, line.name));
+    for (const w of weeks) {
+      const list = line.rows.filter((r) => inWeek(r, w));
+      const sum = list.reduce((s, r) => s + r.amount, 0);
+      const title = `${line.name} · ${w.label} ${monthGen}`;
+      const td = el("td", { class: list.length ? "clickable" : null,
+        onclick: list.length ? () => openEditor(title, list) : null }, sum ? short(sum) : "");
+      if (line.heat && sum) td.style.background = `rgba(122, 31, 51, ${(0.05 + (sum / max) * 0.22).toFixed(3)})`;
+      tr.append(td);
+    }
+    const all = line.rows.reduce((s, r) => s + r.amount, 0);
+    tr.append(el("td", { class: "wk-total" }, short(all)));
+    body.append(tr);
+  }
+  table.append(body);
+  box.append(table, el("p", { class: "weeks-hint" }, "Суммы по неделям месяца, «к» — тысячи. Нажмите на сумму, чтобы увидеть записи."));
+}
+
 // ---------- Список ----------
 
 function renderList(rows) {
@@ -879,8 +947,10 @@ function renderList(rows) {
       group.append(el("div", { class: "tx" },
         el("div", {},
           el("div", {}, row.description || state.names[row.category]),
-          el("div", { class: "tx-cat" }, state.names[row.category] || row.category,
-            row.counterparty ? ` · ${row.counterparty}` : ""),
+          (row.description || "").toLowerCase() === (state.names[row.category] || "").toLowerCase() && !row.counterparty
+            ? null
+            : el("div", { class: "tx-cat" }, state.names[row.category] || row.category,
+              row.counterparty ? ` · ${row.counterparty}` : ""),
         ),
         el("span", { class: `tx-amount ${row.kind}` }, sign + money(row.amount)),
         el("button", { type: "button", class: "icon-btn edit", title: "Изменить запись", "aria-label": "Изменить запись",
@@ -976,6 +1046,17 @@ function setView(view) {
     $(`tab-${name}`).setAttribute("aria-selected", view === name);
     $(`view-${name}`).hidden = view !== name;
   }
+  setScreen({ calendar: "home", table: "table", list: "list" }[view]);
+}
+
+// На телефоне каждая вкладка внизу — отдельный экран (на компьютере всё на одной странице)
+const isPhone = () => matchMedia("(max-width: 720px)").matches;
+
+function setScreen(screen) {
+  document.body.dataset.screen = screen;
+  $("nav-review").setAttribute("aria-selected", screen === "stats" ? "true" : "false");
+  if (screen === "stats") for (const name of ["table", "calendar", "list"]) $(`tab-${name}`).setAttribute("aria-selected", "false");
+  if (isPhone()) window.scrollTo({ top: 0, behavior: "instant" });
 }
 
 async function refresh() {
@@ -993,6 +1074,7 @@ async function refresh() {
     state.rows = rows;
     renderSummary(summary);
     renderTable(rows);
+    renderWeekTable(rows);
     renderCalendar(rows);
     renderList(rows);
   } catch (error) {
@@ -1332,7 +1414,11 @@ async function init() {
   $("tab-list").addEventListener("click", () => setView("list"));
   $("tab-calendar").addEventListener("click", () => setView("calendar"));
   const goTo = (node) => node.scrollIntoView({ behavior: "smooth", block: "start" });
-  $("nav-review").addEventListener("click", () => goTo(document.querySelector(".review")));
+  $("nav-review").addEventListener("click", () => (isPhone() ? setScreen("stats") : goTo(document.querySelector(".review"))));
+  $("fab").addEventListener("click", () => {
+    setView("calendar");
+    $("text").focus();
+  });
   $("nav-debts").addEventListener("click", () => goTo($("debts")));
   $("nav-account").addEventListener("click", openAccount);
   $("account-logout").addEventListener("click", () => { $("account-dialog").close(); logout(); });
@@ -1340,7 +1426,7 @@ async function init() {
   $("nav-limits").addEventListener("click", () => openLimits().catch((e) => setStatus(e.message, true)));
   for (const id of ["tab-calendar", "tab-table", "tab-list"]) {
     $(id).addEventListener("click", () => {
-      if (matchMedia("(max-width: 900px)").matches) goTo(document.querySelector(".ledger"));
+      if (!isPhone() && matchMedia("(max-width: 900px)").matches) goTo(document.querySelector(".ledger"));
     });
   }
   const grow = () => {

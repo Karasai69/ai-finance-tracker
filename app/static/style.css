@@ -89,7 +89,7 @@ h2 { font-size: 22px; margin: 0; }
 .rail-nav .tab[aria-selected="true"] {
   color: var(--note-text); font-weight: 600; background: rgba(220, 184, 102, .16); box-shadow: inset 3px 0 0 var(--ochre-light);
 }
-.nav-ico, .rail-nav .sm, #nav-account, .bars-more { display: none; }
+.nav-ico, .rail-nav .sm, #nav-account, .bars-more, .weeks-wrap, .fab { display: none; }
 .account-quick { display: none; }
 .rosette { display: block; width: 130px; height: 130px; margin: 22px auto 0; flex: none; }
 @media (max-height: 860px) and (min-width: 901px) { .rosette { display: none; } .rail-nav { margin-top: 18px; } }
@@ -587,4 +587,61 @@ input, select, textarea { border-radius: 2px; }
   .bar-meta { font-size: 12px; }
   .main-col { gap: 28px; }
   .side-col { gap: 28px; }
+}
+
+/* ---------- Телефон: отдельные экраны ---------- */
+@media (max-width: 720px) {
+  .rail-nav { grid-template-columns: repeat(5, 1fr); }
+  /* шапка компактнее: бренд прячем, месяц слева */
+  .brand { display: none; }
+  .rail-top { grid-template-columns: 1fr; }
+  .month { justify-content: space-between; }
+
+  /* Главная: ввод + календарь */
+  body[data-screen="home"] .review, body[data-screen="home"] .side-col { display: none; }
+  /* Таблица и список: только записи */
+  body[data-screen="table"] .entry, body[data-screen="list"] .entry,
+  body[data-screen="table"] .review, body[data-screen="list"] .review,
+  body[data-screen="table"] .side-col, body[data-screen="list"] .side-col { display: none; }
+  /* Итоги: разбор месяца, категории, долги */
+  body[data-screen="stats"] .entry, body[data-screen="stats"] .ledger { display: none; }
+  body[data-screen="stats"] .layout { display: flex; flex-direction: column-reverse; gap: 28px; }
+  body[data-screen="stats"] .main-col, body[data-screen="stats"] .side-col { display: grid; }
+  /* на экранах без поля ввода — круглая кнопка «+» */
+  body:not([data-screen="home"]) .fab { display: grid; }
+  .fab {
+    position: fixed; z-index: 35; right: 16px; bottom: calc(76px + env(safe-area-inset-bottom));
+    width: 54px; height: 54px; border-radius: 50%; border: 0; place-items: center;
+    background: var(--ochre); color: #fff; font-size: 30px; line-height: 1; cursor: pointer;
+    box-shadow: 0 8px 20px -6px rgba(42, 20, 24, .45);
+  }
+  .ledger-actions { display: none; }
+  .ledger-bar { margin-bottom: 10px; }
+
+  /* Таблица на телефоне: категории × недели вместо широкой таблицы по дням */
+  #view-table { display: none !important; }
+  body[data-screen="table"] .weeks-wrap { display: block; }
+  .weeks-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+  .weeks-table th, .weeks-table td { padding: 8px 4px; border-bottom: 1px solid var(--rule); text-align: right;
+    font-family: var(--num); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .weeks-table th:first-child { width: 34%; text-align: left; font-family: var(--body); font-weight: 500;
+    white-space: normal; line-height: 1.25; padding-left: 0; }
+  .weeks-table thead th { font: 500 11.5px var(--body); color: var(--muted); text-align: right; border-bottom: 1px solid var(--ink); }
+  .weeks-table thead th:first-child { color: var(--muted); }
+  .weeks-table .wk-total { font-weight: 700; padding-right: 0; }
+  .weeks-table td.clickable { cursor: pointer; }
+  .weeks-table tr.wk-sum th, .weeks-table tr.wk-sum td { font-weight: 700; border-top: 1px solid var(--ink); background: var(--sheet); }
+  .weeks-table tr.wk-income td { color: var(--teal-2); }
+  .weeks-table tr.wk-lend td { color: var(--ochre); }
+  .weeks-table tr.wk-repaid td { color: var(--teal-2); }
+  .weeks-hint { color: var(--muted); font-size: 12.5px; margin: 10px 0 0; }
+
+  .account-quick a.btn { text-decoration: none; }
+
+  /* Вне главной шапка — только месяц и остаток */
+  body:not([data-screen="home"]) .flows, body:not([data-screen="home"]) .hero-label { display: none; }
+  body:not([data-screen="home"]) .hero { margin-top: 6px; }
+  body:not([data-screen="home"]) .hero-value { font-size: 30px; }
+  body:not([data-screen="home"]) .rail-inner { padding-bottom: 12px; }
+  body:not([data-screen="home"]) { padding-bottom: calc(140px + env(safe-area-inset-bottom)); }
 }
