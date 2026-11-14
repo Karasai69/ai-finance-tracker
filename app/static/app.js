@@ -698,6 +698,7 @@ const CAL_GROUPS = [
   { name: "Отдаю", color: "#c0563f", cats: ["charity", "gift"] },
   { name: "Быт и одежда", color: "#8a7a6a", cats: ["household", "laundry", "housing", "clothes"] },
   { name: "Развитие", color: "#2f5d7a", cats: ["books", "sport"] },
+  { name: "Отдых", color: "#5b7a3a", cats: ["leisure"] },
   { name: "Другое", color: "#9aa8a3", cats: ["other"] },
 ];
 const CAL_COLOR = Object.fromEntries(CAL_GROUPS.flatMap((g) => g.cats.map((c) => [c, g.color])));
@@ -810,7 +811,7 @@ function renderCalendar(rows) {
       name, el("b", {}, w.sum ? money(w.sum) : "—"));
   }));
 
-  const legend = el("div", { class: "cal-legend" }, ...CAL_GROUPS.slice(0, 5).map((g) =>
+  const legend = el("div", { class: "cal-legend" }, ...CAL_GROUPS.filter((g) => g.name !== "Другое").map((g) =>
     el("span", {}, el("i", { style: `background:${g.color}` }), g.name)),
     el("span", {}, el("i", { class: "ring" }), "доход или долг"));
 

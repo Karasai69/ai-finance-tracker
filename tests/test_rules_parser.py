@@ -85,3 +85,8 @@ def test_savings_keywords():
 def test_ten_percent_is_savings():
     items, _ = parse("процент с зарплаты 17 250")
     assert items == [("savings", 17250, "save")]
+
+
+def test_leisure_keywords():
+    items, _ = parse("поход с друзьями 20 000, кино 3000")
+    assert [i[0] for i in items] == ["leisure", "leisure"]
