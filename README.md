@@ -211,4 +211,4 @@ Dockerfile, docker-compose.yml, render.yaml, .github/workflows/tests.yml
 
 ## Автор
 
-Студент 4 курса КазНУ, «Компьютерная инженерия» — [github.com/Karasai69](https://github.com/Karasai69)
+Студент 4 курса КазНУ, «Компьютерная инженерия» — [github.com/Karasai69](https://github.com/Karasai69). Второй проект — [Barber Booking](https://github.com/Karasai69/barber-booking): онлайн-запись в барбершоп с Telegram-ботом, Celery и защитой от двойной записи.
