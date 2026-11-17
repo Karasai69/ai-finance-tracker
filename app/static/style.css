@@ -92,6 +92,14 @@ h2 { font-size: 22px; margin: 0; }
 .nav-ico, #nav-account, .weeks-wrap, .fab { display: none; }
 .account-quick { display: none; }
 .rosette { display: block; width: 130px; height: 130px; margin: 22px auto 0; flex: none; }
+.rosette { position: relative; }
+.rosette-svg { display: block; width: 100%; height: 100%; }
+/* 3D-монета вместо плоской розетки: появляется плавно, когда готова */
+.coin3d { position: absolute; inset: 0; width: 100% !important; height: 100% !important; cursor: grab; touch-action: pan-y; animation: coin-in .6s ease-out; }
+.coin3d:active { cursor: grabbing; }
+.has-coin .rosette-svg { visibility: hidden; }
+@keyframes coin-in { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: none; } }
+.auth-coin { display: none; }
 @media (max-height: 860px) and (min-width: 901px) { .rosette { display: none; } .rail-nav { margin-top: 18px; } }
 
 .account { margin-top: auto; padding-top: 24px; display: grid; gap: 6px; justify-items: start; font-size: 14px; }
@@ -910,3 +918,9 @@ body[data-screen="stats"] .savings, body[data-screen="stats"] .year { display: b
   .sv-date { grid-area: date; } .sv-amount { grid-area: amount; } .sv-main .icon-btn { grid-area: x; } .sv-what { grid-area: what; }
   .sv-actions { display: grid; }
 }
+
+/* На телефоне левой панели нет — монета встречает на экране входа */
+@media (max-width: 720px) {
+  .auth-coin { display: block; position: relative; width: 112px; height: 112px; margin: -6px auto 6px; }
+}
+@media (prefers-reduced-motion: reduce) { .coin3d { animation: none; } }

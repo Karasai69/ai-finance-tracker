@@ -113,6 +113,25 @@ function setMonth(month) {
   refresh();
 }
 
+// Календарь перелистывается, как страница: вперёд — влево, назад — вправо
+function flipMonth(delta) {
+  state.flip = delta;
+  setMonth(shiftMonth(state.month, delta));
+}
+
+function playFlip(box) {
+  const delta = state.flip;
+  state.flip = 0;
+  if (!delta || matchMedia("(prefers-reduced-motion: reduce)").matches || !box.animate) return;
+  box.animate(
+    [
+      { transform: `perspective(1400px) rotateY(${delta > 0 ? 70 : -70}deg)`, opacity: 0.2, transformOrigin: delta > 0 ? "left center" : "right center" },
+      { transform: "perspective(1400px) rotateY(0deg)", opacity: 1, transformOrigin: delta > 0 ? "left center" : "right center" },
+    ],
+    { duration: 480, easing: "cubic-bezier(.2,.75,.25,1)" },
+  );
+}
+
 // ---------- Предпросмотр ----------
 
 function categorySelect(value, onChange) {
@@ -820,6 +839,7 @@ function renderCalendar(rows) {
       ? renderCalendarDay(sel.from, byDay.get(sel.from) || [])
       : renderCalendarRange(sel, rows.filter((r) => !sel || (r.date >= sel.from && r.date <= sel.to))),
     el("div", { class: "cal-aside" }, legend, weekBox)));
+  playFlip(grid);
 }
 
 // Подсказка при наведении: на что ушли деньги в этот день
@@ -1608,6 +1628,7 @@ function showAuth() {
   $("account").hidden = true;
   $("auth").hidden = false;
   $("auth-email").focus();
+  placeCoins();
 }
 
 function showApp(user) {
@@ -1626,6 +1647,7 @@ function showApp(user) {
   if (isDemo && !$("text").value) $("text").value = "кофе 900, такси до универа 1 200, друг вернул 5 000";
   requestAnimationFrame(drawGuilloche);
   setMonth(state.month || todayISO().slice(0, 7));
+  placeCoins();
 }
 
 function setAuthMode(mode) {
@@ -1780,6 +1802,35 @@ function drawRosette() {
     '<text x="100" y="109" text-anchor="middle" font-family="Playfair Display, Georgia, serif" font-size="30" font-weight="700" fill="#F6ECE1">₸</text>';
 }
 
+// ---------- 3D-монета ₸ ----------
+// Three.js весит ~125 КБ в сжатом виде, поэтому монета грузится отдельно и уже после страницы.
+// Если WebGL нет или включена экономия трафика — остаётся плоская розетка.
+
+let coinModule = null;
+
+function placeCoin(box) {
+  const src = document.querySelector('meta[name="coin3d"]')?.content;
+  if (!src || !box || box.dataset.coin || !box.offsetParent || navigator.connection?.saveData) return;
+  box.dataset.coin = "loading";
+  coinModule ??= import(src).catch(() => null);
+  coinModule.then((mod) => {
+    if (mod?.mountCoin(box)) {
+      box.dataset.coin = "ready";
+      box.classList.add("has-coin");
+    } else {
+      delete box.dataset.coin;
+    }
+  });
+}
+
+function placeCoins() {
+  const later = window.requestIdleCallback || ((fn) => setTimeout(fn, 400));
+  later(() => {
+    placeCoin($("rosette-box"));
+    placeCoin($("auth-coin"));
+  });
+}
+
 // ---------- Установка как приложение ----------
 
 let installPrompt = null;
@@ -1819,8 +1870,8 @@ async function init() {
   $("parse").addEventListener("click", parseText);
   $("save").addEventListener("click", savePreview);
   $("cancel").addEventListener("click", () => { state.preview = []; renderPreview(); setStatus(""); });
-  $("prev-month").addEventListener("click", () => setMonth(shiftMonth(state.month, -1)));
-  $("next-month").addEventListener("click", () => setMonth(shiftMonth(state.month, 1)));
+  $("prev-month").addEventListener("click", () => flipMonth(-1));
+  $("next-month").addEventListener("click", () => flipMonth(1));
   $("tab-table").addEventListener("click", () => setView("table"));
   $("tab-calendar").addEventListener("click", () => setView("calendar"));
   $("back").addEventListener("click", goBack);

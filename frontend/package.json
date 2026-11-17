@@ -1,0 +1,12 @@
+{
+  "name": "finance-frontend-build",
+  "private": true,
+  "description": "Сборка 3D-монеты: frontend/coin3d.js -> app/static/coin3d.js",
+  "scripts": {
+    "build": "esbuild coin3d.js --bundle --minify --format=esm --target=es2020 --legal-comments=eof --outfile=../app/static/coin3d.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "three": "0.180.0"
+  }
+}

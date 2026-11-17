@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -57,6 +58,7 @@ MONTH_PATTERN = r"^\d{4}-(0[1-9]|1[0-2])$"
 run_migrations()
 
 app = FastAPI(title="AI Finance Tracker", version="0.2.0")
+app.add_middleware(GZipMiddleware, minimum_size=1000)  # скрипты и стили сжимаются в 3–4 раза
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.include_router(auth_router)
 
@@ -79,7 +81,7 @@ def _versioned_index() -> str:
     Когда файл меняется, меняется и ссылка, поэтому браузер не берёт старую версию из кэша.
     """
     html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
-    for name in ("app.js", "style.css"):
+    for name in ("app.js", "style.css", "coin3d.js"):
         digest = hashlib.sha256((STATIC_DIR / name).read_bytes()).hexdigest()[:10]
         html = html.replace(f"/static/{name}", f"/static/{name}?v={digest}")
     return html
