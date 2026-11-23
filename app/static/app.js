@@ -1802,6 +1802,148 @@ function drawRosette() {
     '<text x="100" y="109" text-anchor="middle" font-family="Playfair Display, Georgia, serif" font-size="30" font-weight="700" fill="#F6ECE1">₸</text>';
 }
 
+// ---------- Календарик для полей с датой ----------
+// Системное окно выбора даты нельзя перекрасить, поэтому на компьютере показываем своё,
+// в стиле сайта. Само поле остаётся обычным <input type="date">: дату можно и напечатать.
+// На телефоне — системный выбор даты, он там привычнее и удобнее.
+
+const datePicker = { input: null, box: null, month: null };
+const fineMouse = matchMedia("(pointer: fine)");
+
+function isoOf(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function openDatePicker(input) {
+  closeDatePicker();
+  const value = input.value || todayISO();
+  datePicker.input = input;
+  datePicker.month = value.slice(0, 7);
+  const box = el("div", { class: "dp", role: "dialog", "aria-label": "Выбор даты" });
+  box.addEventListener("mousedown", (e) => e.preventDefault()); // фокус остаётся в поле
+  datePicker.box = box;
+  // Popover поднимает календарик поверх всего, даже над открытым окном (например, «Накопления»)
+  if (box.showPopover) {
+    box.setAttribute("popover", "manual");
+    document.body.append(box);
+    box.showPopover();
+  } else {
+    (input.closest("dialog") || document.body).append(box);
+  }
+  renderDatePicker();
+  placeDatePicker();
+}
+
+function closeDatePicker() {
+  datePicker.box?.remove();
+  datePicker.box = datePicker.input = null;
+}
+
+function placeDatePicker() {
+  const { box, input } = datePicker;
+  if (!box) return;
+  const r = input.getBoundingClientRect();
+  const h = box.offsetHeight;
+  const w = box.offsetWidth;
+  const below = r.bottom + 6 + h <= window.innerHeight || r.top - 6 - h < 0;
+  box.style.top = `${below ? r.bottom + 6 : r.top - 6 - h}px`;
+  box.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - w - 8))}px`;
+}
+
+function pickDate(iso) {
+  const input = datePicker.input;
+  input.value = iso;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+  closeDatePicker();
+  input.focus();
+}
+
+function renderDatePicker() {
+  const { box, input } = datePicker;
+  const [y, m] = datePicker.month.split("-").map(Number);
+  const first = new Date(y, m - 1, 1);
+  const start = new Date(y, m - 1, 1 - ((first.getDay() + 6) % 7));
+  const today = todayISO();
+  const title = first.toLocaleDateString("ru-RU", { month: "long", year: "numeric" }).replace(" г.", "");
+  const step = (delta) => () => {
+    datePicker.month = shiftMonth(datePicker.month, delta);
+    renderDatePicker();
+  };
+  const grid = el("div", { class: "dp-grid", role: "grid" },
+    ...["пн", "вт", "ср", "чт", "пт", "сб", "вс"].map((w, i) => el("span", { class: `dp-wd${i >= 5 ? " we" : ""}` }, w)));
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+    const iso = isoOf(d);
+    const cls = ["dp-day"];
+    if (d.getMonth() !== m - 1) cls.push("other");
+    if (iso === today) cls.push("today");
+    if (iso === input.value) cls.push("sel");
+    if (i % 7 >= 5) cls.push("we");
+    grid.append(el("button", {
+      type: "button", class: cls.join(" "),
+      "aria-label": d.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" }),
+      "aria-pressed": iso === input.value ? "true" : "false",
+      onclick: () => pickDate(iso),
+    }, d.getDate()));
+  }
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  box.replaceChildren(
+    el("div", { class: "dp-head" },
+      el("button", { type: "button", class: "dp-nav", "aria-label": "Предыдущий месяц", onclick: step(-1) }, "‹"),
+      el("strong", { class: "dp-title" }, title[0].toUpperCase() + title.slice(1)),
+      el("button", { type: "button", class: "dp-nav", "aria-label": "Следующий месяц", onclick: step(1) }, "›")),
+    grid,
+    el("div", { class: "dp-foot" },
+      el("button", { type: "button", class: "dp-quick", onclick: () => pickDate(isoOf(yesterday)) }, "Вчера"),
+      el("button", { type: "button", class: "dp-quick strong", onclick: () => pickDate(today) }, "Сегодня")),
+  );
+}
+
+function setupDatePicker() {
+  document.addEventListener("click", (e) => {
+    const input = e.target.closest?.('input[type="date"]');
+    if (input && fineMouse.matches) {
+      e.preventDefault(); // не открывать системное окно
+      if (datePicker.input !== input) openDatePicker(input);
+      return;
+    }
+    if (datePicker.box && !datePicker.box.contains(e.target)) closeDatePicker();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (!datePicker.box) {
+      const input = e.target.closest?.('input[type="date"]');
+      if (input && fineMouse.matches && (e.key === "F4" || (e.altKey && e.key === "ArrowDown") || e.key === " ")) {
+        e.preventDefault();
+        openDatePicker(input);
+      }
+      return;
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation(); // не закрывать заодно и окно, в котором поле
+      closeDatePicker();
+    } else if (e.key === "PageUp" || e.key === "PageDown") {
+      e.preventDefault();
+      datePicker.month = shiftMonth(datePicker.month, e.key === "PageUp" ? -1 : 1);
+      renderDatePicker();
+    }
+  }, true);
+  // Напечатали дату вручную — календарик показывает её же
+  document.addEventListener("input", (e) => {
+    if (datePicker.box && e.target === datePicker.input && e.target.value) {
+      datePicker.month = e.target.value.slice(0, 7);
+      renderDatePicker();
+    }
+  });
+  document.addEventListener("focusout", (e) => {
+    if (e.target === datePicker.input && !datePicker.box?.contains(e.relatedTarget)) closeDatePicker();
+  });
+  window.addEventListener("resize", closeDatePicker);
+  document.addEventListener("scroll", placeDatePicker, true);
+}
+
 // ---------- 3D-монета ₸ ----------
 // Three.js весит ~125 КБ в сжатом виде, поэтому монета грузится отдельно и уже после страницы.
 // Если WebGL нет или включена экономия трафика — остаётся плоская розетка.
@@ -1870,6 +2012,7 @@ async function init() {
   $("parse").addEventListener("click", parseText);
   $("save").addEventListener("click", savePreview);
   $("cancel").addEventListener("click", () => { state.preview = []; renderPreview(); setStatus(""); });
+  setupDatePicker();
   $("prev-month").addEventListener("click", () => flipMonth(-1));
   $("next-month").addEventListener("click", () => flipMonth(1));
   $("tab-table").addEventListener("click", () => setView("table"));

@@ -924,3 +924,50 @@ body[data-screen="stats"] .savings, body[data-screen="stats"] .year { display: b
   .auth-coin { display: block; position: relative; width: 112px; height: 112px; margin: -6px auto 6px; }
 }
 @media (prefers-reduced-motion: reduce) { .coin3d { animation: none; } }
+
+/* ---------- Календарик для полей с датой (на компьютере) ---------- */
+
+@media (pointer: fine) {
+  input[type="date"] {
+    padding-right: 34px !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237a1f33' stroke-width='1.6'%3E%3Crect x='3.5' y='5' width='17' height='15' rx='1.5'/%3E%3Cpath d='M3.5 9.5h17M8 3v4M16 3v4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 9px center;
+    background-size: 18px;
+    cursor: pointer;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator { display: none; }
+}
+
+.dp {
+  position: fixed; z-index: 1000; width: 288px; padding: 12px 12px 10px; margin: 0; inset: auto;
+  background: var(--sheet); border: 1px solid var(--rule); border-top: 3px solid var(--ochre);
+  border-radius: 3px; box-shadow: 0 14px 36px rgba(74, 21, 36, .22), 0 2px 6px rgba(74, 21, 36, .08);
+  color: var(--ink); font-family: var(--body, Inter, system-ui, sans-serif);
+  animation: dp-in .14s ease-out;
+}
+@keyframes dp-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.dp-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.dp-title { font: 700 17px var(--display); color: var(--wine); }
+.dp-nav {
+  width: 30px; height: 30px; border: 1px solid var(--rule); background: #fff; border-radius: 50%;
+  color: var(--teal); font-size: 18px; line-height: 1; cursor: pointer;
+}
+.dp-nav:hover { border-color: var(--ochre); background: rgba(220, 184, 102, .14); }
+.dp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.dp-wd { text-align: center; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding: 4px 0 6px; }
+.dp-wd.we { color: var(--brick); }
+.dp-day {
+  height: 34px; border: 1px solid transparent; border-radius: 2px; background: transparent;
+  font: 600 14.5px var(--num); font-variant-numeric: lining-nums tabular-nums; color: var(--ink); cursor: pointer;
+}
+.dp-day.we { color: var(--brick); }
+.dp-day.other { color: #b9ad9c; font-weight: 400; }
+.dp-day:hover { background: rgba(122, 31, 51, .08); }
+.dp-day.today { border-color: var(--ochre); }
+.dp-day.sel, .dp-day.sel:hover { background: var(--teal); color: #fff; border-color: var(--teal); }
+.dp-foot { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--rule); }
+.dp-quick { border: 1px solid var(--rule); background: #fff; border-radius: 2px; padding: 5px 12px; font-size: 13.5px; color: var(--ink); cursor: pointer; }
+.dp-quick:hover { border-color: var(--ochre); }
+.dp-quick.strong { background: var(--teal); border-color: var(--teal); color: #fff; }
+.dp-quick.strong:hover { background: var(--wine); }
