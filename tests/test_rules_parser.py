@@ -93,5 +93,5 @@ def test_leisure_keywords():
 
 
 def test_subscriptions_keywords():
-    items, _ = parse("apple память 499, тариф 3000")
+    items, _ = parse("apple память 499, подписка спотифай 1500")
     assert [i[0] for i in items] == ["subscriptions", "subscriptions"]
