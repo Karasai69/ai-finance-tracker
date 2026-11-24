@@ -712,7 +712,7 @@ function renderTable(rows) {
 
 // Группы для цветных точек: цвет — подсказка, название группы есть в легенде и в списке дня
 const CAL_GROUPS = [
-  { name: "Еда", color: "#7a1f33", cats: ["products", "vegetables", "convenience", "cafe", "nuts"] },
+  { name: "Еда", color: "#7a1f33", cats: ["products", "vegetables", "convenience", "cafe", "fastfood", "nuts"] },
   { name: "Дорога", color: "#a8822e", cats: ["transport"] },
   { name: "Отдаю", color: "#c0563f", cats: ["charity", "gift"] },
   { name: "Быт и одежда", color: "#8a7a6a", cats: ["household", "laundry", "housing", "clothes"] },

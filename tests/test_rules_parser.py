@@ -59,7 +59,7 @@ def test_description_is_cleaned():
 def test_food_and_clean_description():
     items, _ = parse_text("сегодня съел самсу за 500 и мороженое за 500", TODAY)
     assert [(i.category, i.amount, i.description) for i in items] == [
-        ("cafe", 500, "съел самсу"),
+        ("fastfood", 500, "съел самсу"),
         ("cafe", 500, "мороженое"),
     ]
 
@@ -95,3 +95,8 @@ def test_leisure_keywords():
 def test_subscriptions_keywords():
     items, _ = parse("apple память 499, подписка спотифай 1500")
     assert [i[0] for i in items] == ["subscriptions", "subscriptions"]
+
+
+def test_fastfood_keywords():
+    items, _ = parse("донер 1500, самса 400, кофе 900")
+    assert [i[0] for i in items] == ["fastfood", "fastfood", "cafe"]
