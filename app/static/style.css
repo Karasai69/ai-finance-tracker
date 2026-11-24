@@ -971,3 +971,11 @@ body[data-screen="stats"] .savings, body[data-screen="stats"] .year { display: b
 .dp-quick:hover { border-color: var(--ochre); }
 .dp-quick.strong { background: var(--teal); border-color: var(--teal); color: #fff; }
 .dp-quick.strong:hover { background: var(--wine); }
+
+/* ---------- Копировать день и вставить ---------- */
+.day-clip { margin-top: 14px; }
+.day-clip:empty { display: none; }
+.day-clip.active { padding: 12px; background: rgba(220, 184, 102, .16); border: 1px dashed var(--ochre); border-radius: 3px; }
+.day-clip-note { margin: 0 0 10px; font-size: 14px; }
+.day-clip-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.day-clip-actions .btn { padding: 7px 14px; font-size: 14px; }

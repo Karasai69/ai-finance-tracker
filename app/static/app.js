@@ -969,12 +969,69 @@ function renderCalendarDay(day, items) {
       el("b", { class: row.kind }, sign + money(row.amount)),
     ));
   }
+  panel.append(dayClipboard(day, items));
   panel.append(el("button", { type: "button", class: "link-btn cal-add", onclick: () => {
     $("date").value = day;
     $("text").focus();
     $("text").scrollIntoView({ behavior: "smooth", block: "center" });
   } }, "+ Добавить запись на этот день"));
   return panel;
+}
+
+// ---------- Копировать день и вставить в другой ----------
+// Записали траты не на тот день: «Копировать день» → открыть нужный день → «Перенести сюда».
+// «Вставить копию» оставляет записи и на старом дне (удобно для одинаковых дней).
+
+const shortDay = (iso) => new Date(iso + "T00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+
+function recordsWord(n) {
+  return n % 10 === 1 && n % 100 !== 11 ? "запись"
+    : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? "записи" : "записей";
+}
+
+function dayClipboard(day, items) {
+  const box = el("div", { class: "day-clip" });
+  const clip = state.clip;
+  if (clip && clip.day !== day) {
+    const note = el("p", { class: "day-clip-note" }, `Скопировано: ${shortDay(clip.day)}, ${clip.rows.length} ${recordsWord(clip.rows.length)}`);
+    const move = el("button", { type: "button", class: "btn primary" }, "Перенести сюда");
+    const copy = el("button", { type: "button", class: "btn ghost" }, "Вставить копию");
+    const cancel = el("button", { type: "button", class: "link-btn" }, "Отмена");
+    const run = (asMove) => async () => {
+      move.disabled = copy.disabled = true;
+      try {
+        if (asMove) {
+          await Promise.all(clip.rows.map((r) =>
+            api(`/api/transactions/${r.id}`, { method: "PATCH", body: JSON.stringify({ date: day }) })));
+        } else {
+          await api("/api/transactions", { method: "POST",
+            body: JSON.stringify({ items: clip.rows.map((r) => ({ ...restorable(r), date: day })) }) });
+        }
+        state.clip = null;
+        showUndo(asMove ? `Записи перенесены на ${shortDay(day)}` : `Записи скопированы на ${shortDay(day)}`, null);
+        await refresh();
+      } catch (error) {
+        move.disabled = copy.disabled = false;
+        note.textContent = error.message;
+      }
+    };
+    move.addEventListener("click", run(true));
+    copy.addEventListener("click", run(false));
+    cancel.addEventListener("click", () => { state.clip = null; renderCalendar(state.rows); });
+    box.classList.add("active");
+    box.append(note, el("div", { class: "day-clip-actions" }, move, copy, cancel));
+  } else if (clip && clip.day === day) {
+    box.classList.add("active");
+    box.append(
+      el("p", { class: "day-clip-note" }, "День скопирован. Откройте нужный день в календаре и нажмите «Перенести сюда» или «Вставить копию»."),
+      el("button", { type: "button", class: "link-btn", onclick: () => { state.clip = null; renderCalendar(state.rows); } }, "Отмена"));
+  } else if (items.length) {
+    box.append(el("button", { type: "button", class: "link-btn", onclick: () => {
+      state.clip = { day, rows: items.map((r) => ({ ...r })) };
+      renderCalendar(state.rows);
+    } }, "Копировать день"));
+  }
+  return box;
 }
 
 // ---------- Таблица для телефона: категории × недели ----------
