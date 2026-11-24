@@ -90,3 +90,8 @@ def test_ten_percent_is_savings():
 def test_leisure_keywords():
     items, _ = parse("поход с друзьями 20 000, кино 3000")
     assert [i[0] for i in items] == ["leisure", "leisure"]
+
+
+def test_subscriptions_keywords():
+    items, _ = parse("apple память 499, тариф 3000")
+    assert [i[0] for i in items] == ["subscriptions", "subscriptions"]
