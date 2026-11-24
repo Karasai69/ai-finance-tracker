@@ -192,7 +192,7 @@ def test_budgets_set_update_delete_and_in_summary(client):
     assert cats["cafe"]["total"] == 0 and cats["cafe"]["limit"] == 5000  # лимит без трат тоже виден
 
     assert client.put("/api/budgets/transport", json={"limit": None}).json() == [
-        {"category": "cafe", "name": "Кафе и перекусы", "limit": 5000}
+        {"category": "cafe", "name": "Кафе и кофе", "limit": 5000}
     ]
 
 
@@ -235,7 +235,7 @@ def test_insights_without_ai(client):
     _save(client, {"date": "2026-11-10", "amount": 900, "category": "cafe", "description": "шашлык"})
     result = client.post("/api/insights", params={"month": "2026-11"}).json()
     assert result["source"] == "rules"
-    assert "«Кафе и перекусы»" in result["points"][0]
+    assert "«Кафе и кофе»" in result["points"][0]
 
 
 def test_pwa_files(make_client):
