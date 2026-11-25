@@ -903,6 +903,41 @@ function backToMonth() {
 }
 
 // Сводка за месяц или неделю: по категориям, как «Куда ушли деньги», но с числом записей
+// На что именно ушли деньги внутри категории: три самые крупные траты (одинаковые описания
+// складываются) и «остальное». Полоска категории делится на части тем же цветом, что подписи.
+const PART_COLORS = ["#7a1f33", "#a8822e", "#2f6b4f", "#2f5d7a"];
+const REST_COLOR = "#b9ad9c";
+
+function categoryParts(rows, catName) {
+  const groups = new Map();
+  for (const r of rows) {
+    const name = (r.description || "").trim() || catName;
+    const key = name.toLowerCase();
+    const g = groups.get(key) || { name, sum: 0 };
+    g.sum += r.amount;
+    groups.set(key, g);
+  }
+  const sorted = [...groups.values()].sort((a, b) => b.sum - a.sum);
+  // Описаний нет вовсе — показывать нечего, остаётся обычная полоска
+  if (sorted.length === 1 && sorted[0].name === catName) return null;
+  const top = sorted.slice(0, sorted.length <= 4 ? 4 : 3).map((g, i) => ({ ...g, color: PART_COLORS[i] }));
+  const rest = sorted.slice(top.length);
+  if (rest.length) top.push({ name: "остальное", sum: rest.reduce((s, g) => s + g.sum, 0), color: REST_COLOR });
+  return top;
+}
+
+function partsBlock(parts, share) {
+  const total = parts.reduce((s, p) => s + p.sum, 0);
+  return [
+    el("span", { class: "cal-seg", style: `width:${Math.max(35, share).toFixed(1)}%` },
+      ...parts.map((p) => el("span", { style: `flex:${p.sum};background:${p.color}`,
+        title: `${p.name}: ${money(p.sum)} · ${Math.round((p.sum / total) * 100)}%` }))),
+    el("span", { class: "cal-leg" },
+      ...parts.map((p) => el("span", { class: "cal-leg-it" },
+        el("span", { class: "sq", style: `background:${p.color}` }), `${p.name} `, el("strong", {}, money(p.sum))))),
+  ];
+}
+
 function renderCalendarRange(sel, items) {
   const [y, m] = state.month.split("-").map(Number);
   const monthTitle = new Date(y, m - 1, 1).toLocaleDateString("ru-RU", { month: "long" });
@@ -914,6 +949,9 @@ function renderCalendarRange(sel, items) {
     const c = byCat.get(r.category) || { sum: 0, count: 0 };
     c.sum += r.amount; c.count += 1;
     byCat.set(r.category, c);
+  }
+  for (const [cat, c] of byCat) {
+    c.parts = categoryParts(expenses.filter((r) => r.category === cat), state.names[cat] || cat);
   }
   const days = new Set(expenses.map((r) => r.date)).size;
   const panel = el("aside", { class: `cal-day${sel ? "" : " cal-month"}`, "aria-live": "polite" },
@@ -929,7 +967,9 @@ function renderCalendarRange(sel, items) {
       el("i", { style: `background:${CAL_COLOR[cat] || "#c9d3cc"}` }),
       el("span", {}, state.names[cat] || cat,
         el("small", {}, `${c.count} ${plural(c.count, "раз", "раза", "раз")} · ${Math.round((c.sum / spent) * 100)}%`),
-        el("span", { class: "cal-share" }, el("span", { style: `width:${Math.max(2, (c.sum / spent) * 100).toFixed(1)}%;background:${CAL_COLOR[cat] || "#c9d3cc"}` }))),
+        ...(c.parts
+          ? partsBlock(c.parts, (c.sum / spent) * 100)
+          : [el("span", { class: "cal-share" }, el("span", { style: `width:${Math.max(2, (c.sum / spent) * 100).toFixed(1)}%;background:${CAL_COLOR[cat] || "#c9d3cc"}` }))])),
       el("b", {}, money(c.sum)),
     ));
   }

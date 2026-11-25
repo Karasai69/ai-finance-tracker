@@ -979,3 +979,14 @@ body[data-screen="stats"] .savings, body[data-screen="stats"] .year { display: b
 .day-clip-note { margin: 0 0 10px; font-size: 14px; }
 .day-clip-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .day-clip-actions .btn { padding: 7px 14px; font-size: 14px; }
+
+/* ---------- Сводка: полоска категории по частям и подписи, на что ушли деньги ---------- */
+.cal-it .cal-seg { display: flex; gap: 2px; height: 9px; margin-top: 6px; border-radius: 2px; overflow: hidden; }
+.cal-it .cal-seg > span { display: block; height: 100%; min-width: 3px; }
+.cal-it .cal-leg { display: block; margin-top: 5px; font-size: 13px; line-height: 1.6; white-space: normal; overflow: visible; color: var(--ink); }
+.cal-it .cal-leg-it { display: inline-block; margin-right: 10px; font-size: 13px; overflow: visible; }
+.cal-it .cal-leg-it .sq { display: inline-block; width: 8px; height: 8px; border-radius: 1px; margin-right: 5px; }
+.cal-it .cal-leg-it strong { font: 700 13px var(--num); white-space: nowrap; }
+.cal-cat:hover .cal-leg, .cal-cat:hover .cal-leg-it { color: var(--ink); }
+.cal-cat { align-items: start; }
+.cal-cat > i { margin-top: 7px; }
