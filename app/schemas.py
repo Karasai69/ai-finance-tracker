@@ -113,6 +113,8 @@ class Summary(BaseModel):
     repaid: float
     saved: float = 0  # отложил за месяц (за вычетом того, что взял из накоплений)
     savings_total: float = 0  # всего в накоплениях за всё время
+    borrowed: float = 0  # взял из запаса (BCC) за месяц, за вычетом возвращённого
+    borrowed_total: float = 0  # сколько осталось вернуть в запас за всё время
     balance: float
     by_category: list[CategoryTotal]
     by_day: list[DayTotal]

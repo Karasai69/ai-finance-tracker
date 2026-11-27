@@ -25,6 +25,8 @@ const KIND_INFO = {
   repaid: { label: "Вернули долг", sign: "+" },
   save: { label: "Отложил", sign: "→ " },
   unsave: { label: "Взял из накоплений", sign: "+" },
+  borrow: { label: "Взял из BCC", sign: "+" },
+  payback: { label: "Вернул в BCC", sign: "→ " },
 };
 const kindSign = (kind) => KIND_INFO[kind]?.sign || "";
 const kindLabel = (row) => {
@@ -280,6 +282,11 @@ function renderSummary(summary) {
   $("sum-lent").textContent = money(summary.lent);
   $("sum-repaid").textContent = money(summary.repaid);
   $("repaid-box").hidden = !summary.repaid;
+  // «Вернуть в BCC»: видно, пока есть невозвращённое или в этом месяце были такие записи
+  $("bcc-box").hidden = !summary.borrowed_total && !summary.borrowed;
+  $("sum-bcc").textContent = money(summary.borrowed_total || 0);
+  $("sum-bcc-month").textContent = summary.borrowed
+    ? `за месяц ${summary.borrowed > 0 ? "взял" : "вернул"} ${money(Math.abs(summary.borrowed))}` : "";
   $("sum-saved").textContent = money(summary.saved || 0);
   $("sum-saved-total").textContent = summary.savings_total ? `всего ${money(summary.savings_total)}` : "";
   $("savings-total").textContent = money(summary.savings_total || 0);
@@ -615,6 +622,8 @@ function renderTable(rows) {
   const hasRepaid = rows.some((r) => r.kind === "repaid");
   const hasSave = rows.some((r) => r.kind === "save");
   const hasUnsave = rows.some((r) => r.kind === "unsave");
+  const hasBorrow = rows.some((r) => r.kind === "borrow");
+  const hasPayback = rows.some((r) => r.kind === "payback");
 
   // Суммы по дням
   const cells = new Map(); // "2026-11-04|transport" -> { total, notes[], rows[] }
@@ -648,6 +657,8 @@ function renderTable(rows) {
     hasRepaid && { key: "repaid", title: "Вернули", cls: "col-income" },
     hasSave && { key: "save", title: "Отложил", cls: "col-lend" },
     hasUnsave && { key: "unsave", title: "Из накоплений", cls: "col-income" },
+    hasBorrow && { key: "borrow", title: "Взял из BCC", cls: "col-income" },
+    hasPayback && { key: "payback", title: "Вернул в BCC", cls: "col-lend" },
     ...expenseCats.map((key, i) => ({ key, title: state.names[key] || key, heat: true, cls: i === 0 ? "col-first-cat" : null })),
   ].filter(Boolean);
 
@@ -712,7 +723,7 @@ function renderTable(rows) {
 
 // Группы для цветных точек: цвет — подсказка, название группы есть в легенде и в списке дня
 const CAL_GROUPS = [
-  { name: "Еда", color: "#7a1f33", cats: ["products", "vegetables", "convenience", "cafe", "fastfood", "nuts"] },
+  { name: "Еда", color: "#7a1f33", cats: ["products", "vegetables", "convenience", "cafe", "fastfood", "nuts", "sweets"] },
   { name: "Дорога", color: "#a8822e", cats: ["transport"] },
   { name: "Отдаю", color: "#c0563f", cats: ["charity", "gift"] },
   { name: "Быт и одежда", color: "#8a7a6a", cats: ["household", "laundry", "housing", "clothes"] },
@@ -976,6 +987,7 @@ function renderCalendarRange(sel, items) {
   const flows = [
     ["income", "Доходы", "+"], ["lend", "Дал в долг", "→ "], ["repaid", "Вернули долг", "+"],
     ["save", "Отложил", "→ "], ["unsave", "Взял из накоплений", "+"],
+    ["borrow", "Взял из BCC", "+"], ["payback", "Вернул в BCC", "→ "],
   ].map(([kind, name, sign]) => {
     const list = items.filter((r) => r.kind === kind);
     if (!list.length) return null;
@@ -1111,7 +1123,7 @@ function renderWeekTable(rows) {
   const lines = [
     ...cats.map((c) => ({ name: state.names[c] || c, rows: expense.filter((r) => r.category === c), heat: true })),
     { name: "Всего расходов", rows: expense, cls: "wk-sum" },
-    ...[["income", "Доходы"], ["lend", "Дал в долг"], ["repaid", "Вернули"], ["save", "Отложил"], ["unsave", "Из накоплений"]]
+    ...[["income", "Доходы"], ["lend", "Дал в долг"], ["repaid", "Вернули"], ["save", "Отложил"], ["unsave", "Из накоплений"], ["borrow", "Взял из BCC"], ["payback", "Вернул в BCC"]]
       .map(([k, name]) => ({ name, rows: rows.filter((r) => r.kind === k), cls: `wk-${k}` }))
       .filter((l) => l.rows.length),
   ];

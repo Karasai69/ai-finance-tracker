@@ -478,3 +478,20 @@ def test_delete_debt_returns_items_for_undo(make_client):
     assert r["items"][0]["counterparty"] == "Дана"
     c.post("/api/transactions", json={"items": r["items"]})  # «Вернуть»
     assert c.get("/api/debts").json()[0]["balance"] == 500
+
+
+def test_bcc_borrow_adds_to_balance_and_tracks_what_to_return(make_client):
+    c = make_client()
+    c.post("/api/auth/register", json={"email": "b@kz.kz", "password": "password123"})
+    c.post("/api/transactions", json={"items": [
+        {"date": "2026-10-20", "amount": 30000, "category": "bcc_out"},
+        {"date": "2026-11-01", "amount": 100000, "category": "income"},
+        {"date": "2026-11-05", "amount": 50000, "category": "bcc_out", "description": "на поездку"},
+        {"date": "2026-11-20", "amount": 20000, "category": "bcc_in"},
+        {"date": "2026-11-21", "amount": 10000, "category": "sweets", "description": "чипсы"},
+    ]})
+    s = c.get("/api/summary", params={"month": "2026-11"}).json()
+    assert s["borrowed"] == 30000  # за месяц: взял 50 000, вернул 20 000
+    assert s["borrowed_total"] == 60000  # осталось вернуть за всё время
+    assert s["income"] == 100000 and s["expense"] == 10000  # это не доход и не расход
+    assert s["balance"] == 100000 - 10000 + 30000

@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app import parser
 from app.auth import get_current_user
 from app.auth import router as auth_router
-from app.categories import CATEGORIES, EXPENSE, KINDS, PERSON_KINDS, SAVE, UNSAVE, kind_of, normalize_category
+from app.categories import BORROW, CATEGORIES, EXPENSE, PAYBACK, KINDS, PERSON_KINDS, SAVE, UNSAVE, kind_of, normalize_category
 from app.config import settings
 from app.database import get_db
 from app.excel import build_workbook
@@ -355,6 +355,7 @@ def summary(
     lent = by_kind.get("lend", 0.0)
     repaid = by_kind.get("repaid", 0.0)
     saved = round(by_kind.get(SAVE, 0.0) - by_kind.get(UNSAVE, 0.0), 2)
+    borrowed = round(by_kind.get(BORROW, 0.0) - by_kind.get(PAYBACK, 0.0), 2)
     return Summary(
         month=month,
         income=income,
@@ -363,7 +364,9 @@ def summary(
         repaid=repaid,
         saved=saved,
         savings_total=_savings_total(db, user.id),
-        balance=round(income - expense - lent + repaid - saved, 2),
+        borrowed=borrowed,
+        borrowed_total=_borrowed_total(db, user.id),
+        balance=round(income - expense - lent + repaid - saved + borrowed, 2),
         by_category=by_category,
         by_day=list(days.values()),
         prev_month=prev_start.strftime("%Y-%m"),
@@ -371,6 +374,12 @@ def summary(
         expense_to_date=sum(cur_by_cat.values()),
         prev_expense=sum(prev_by_cat.values()),
     )
+
+
+def _borrowed_total(db: Session, user_id: int) -> float:
+    """Сколько осталось вернуть в запас (BCC) за всё время: взял минус вернул."""
+    sums = _sum_by(db, Transaction.kind, Transaction.user_id == user_id, Transaction.kind.in_([BORROW, PAYBACK]))
+    return round(sums.get(BORROW, 0.0) - sums.get(PAYBACK, 0.0), 2)
 
 
 def _savings_total(db: Session, user_id: int) -> float:

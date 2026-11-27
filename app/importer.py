@@ -20,6 +20,7 @@ from app.schemas import ParsedItem
 MAX_ROWS = 5000
 _NAME_TO_KEY = {name.lower(): key for key, (name, _) in CATEGORIES.items()}
 _NAME_TO_KEY["10 процентов"] = "savings"  # старая категория из прежних выгрузок
+_NAME_TO_KEY["орехи и снеки"] = "nuts"  # прежнее название
 _NAME_TO_KEY["кафе и перекусы"] = "cafe"  # прежнее название «Кафе и кофе» — чтобы старые копии загружались
 
 

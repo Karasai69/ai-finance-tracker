@@ -100,3 +100,10 @@ def test_subscriptions_keywords():
 def test_fastfood_keywords():
     items, _ = parse("донер 1500, самса 400, кофе 900")
     assert [i[0] for i in items] == ["fastfood", "fastfood", "cafe"]
+
+
+def test_sweets_and_bcc():
+    items, _ = parse("чипсы 800, орехи 1500, взял из BCC 50 000, вернул в BCC 20 000")
+    assert [(i[0], i[2]) for i in items] == [
+        ("sweets", "expense"), ("nuts", "expense"), ("bcc_out", "borrow"), ("bcc_in", "payback"),
+    ]
