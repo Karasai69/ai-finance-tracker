@@ -1,0 +1,18 @@
+name: Keep awake in the evening
+
+# Render's free plan puts the server to sleep after 15 minutes without requests.
+# This pings it every 5 minutes from 20:00 to 01:00 Almaty time (15:00-20:00 UTC),
+# so the site opens instantly in the hours it is actually used.
+on:
+  schedule:
+    - cron: "55 14 * * *"
+    - cron: "*/5 15-19 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping the health endpoint
+        run: curl -fsS --retry 3 --retry-delay 20 --max-time 90 https://ai-finance-tracker-05rj.onrender.com/api/health
