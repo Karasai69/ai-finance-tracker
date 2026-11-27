@@ -1223,8 +1223,13 @@ function renderEditor() {
       try {
         const body = { ...draft, counterparty: isPersonKind(draft.category) ? draft.counterparty : null };
         await api(`/api/transactions/${row.id}`, { method: "PATCH", body: JSON.stringify(body) });
+        const single = editor.ids.length === 1;
         await refresh();
-        renderEditor();
+        if (single) {
+          $("editor").close(); // одна запись — сохранили и закрыли окно
+        } else {
+          renderEditor(); // записей несколько — окно остаётся, чтобы поправить остальные
+        }
         setStatus("Изменения сохранены");
       } catch (error) {
         note.textContent = error.message;
